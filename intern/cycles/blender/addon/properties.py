@@ -140,11 +140,6 @@ enum_texture_limit = (
     ('8192', "8192", "Limit texture size to 8192 pixels", 7),
     )
 
-enum_aov_types = (
-    ('VALUE', "Value", "Write a Value pass", 0),
-    ('COLOR', "Color", "Write a color pass", 1),
-    )
-
 class CyclesRenderSettings(bpy.types.PropertyGroup):
     @classmethod
     def register(cls):
@@ -1162,12 +1157,6 @@ def update_render_passes(self, context):
         rl = rd.layers.active
         rl.update_render_passes()
 
-class CyclesAOVSettings(bpy.types.PropertyGroup):
-    @classmethod
-    def register(cls):
-        cls.name = StringProperty(name="Name", update=update_render_passes)
-        cls.type = EnumProperty(name="Type", update=update_render_passes, items=enum_aov_types, default='COLOR')
-
 def update_render_passes(self, context):
     scene = context.scene
     rd = scene.render
@@ -1281,8 +1270,6 @@ class CyclesRenderLayerSettings(bpy.types.PropertyGroup):
                 default=False,
                 update=update_render_passes,
         )
-        cls.aovs = bpy.props.CollectionProperty(type=CyclesAOVSettings)
-        cls.active_aov = IntProperty(default=0)
         cls.use_pass_crypto_object = BoolProperty(
                 name="CryptoMatte Object",
                 description="CryptoMatte Object pass",
@@ -1486,7 +1473,6 @@ def register():
     bpy.utils.register_class(CyclesCurveSettings)
     bpy.utils.register_class(CyclesDeviceSettings)
     bpy.utils.register_class(CyclesPreferences)
-    bpy.utils.register_class(CyclesAOVSettings)
     bpy.utils.register_class(CyclesRenderLayerSettings)
 
 
@@ -1503,5 +1489,4 @@ def unregister():
     bpy.utils.unregister_class(CyclesCurveSettings)
     bpy.utils.unregister_class(CyclesDeviceSettings)
     bpy.utils.unregister_class(CyclesPreferences)
-    bpy.utils.unregister_class(CyclesAOVSettings)
     bpy.utils.unregister_class(CyclesRenderLayerSettings)

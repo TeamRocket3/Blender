@@ -4814,62 +4814,6 @@ void OutputNode::compile(OSLCompiler& compiler)
 		compiler.add(this, "node_output_displacement");
 }
 
-/* AOV Output */
-
-NODE_DEFINE(AOVOutputNode)
-{
-	NodeType* type = NodeType::add("aov_output", create, NodeType::SHADER);
-
-	SOCKET_IN_COLOR(color, "Color", make_float3(0.0f, 0.0f, 0.0f));
-	SOCKET_IN_FLOAT(value, "Value", 0.0f);
-
-	SOCKET_STRING(name, "AOV Name", ustring(""));
-
-	return type;
-}
-
-AOVOutputNode::AOVOutputNode()
-: ShaderNode(node_type)
-{
-	special_type = SHADER_SPECIAL_TYPE_AOV_OUTPUT;
-}
-
-void AOVOutputNode::compile(SVMCompiler& compiler)
-{
-	int dummy;
-	AOV *aov = compiler.film->passes.get_aov(name, dummy);
-
-	if(!aov) {
-		return;
-	}
-
-	if(aov->type != AOV_FLOAT) {
-		compiler.add_node(NODE_AOV_WRITE_FLOAT3, compiler.stack_assign(input("Color")), aov->index);
-	}
-	else {
-		compiler.add_node(NODE_AOV_WRITE_FLOAT, compiler.stack_assign(input("Value")), aov->index);
-	}
-}
-
-void AOVOutputNode::compile(OSLCompiler& compiler)
-{
-	int dummy;
-	AOV *aov = compiler.film->passes.get_aov(name, dummy);
-
-	if(!aov) {
-		return;
-	}
-
-	compiler.parameter("index", aov->index);
-
-	if(aov->type != AOV_FLOAT) {
-		compiler.add(this, "node_write_aov_float3");
-	}
-	else {
-		compiler.add(this, "node_write_aov_float");
-	}
-}
-
 /* Math */
 
 NODE_DEFINE(MathNode)

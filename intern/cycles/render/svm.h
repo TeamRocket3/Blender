@@ -194,7 +194,6 @@ protected:
 	                       ShaderNode *skip_node = NULL);
 	void generate_node(ShaderNode *node, ShaderNodeSet& done);
 	void generate_closure_node(ShaderNode *node, CompilerState *state);
-	void generate_aov_node(ShaderNode *node, CompilerState *state);
 	void generated_shared_closure_nodes(ShaderNode *root_node,
 	                                    ShaderNode *node,
 	                                    CompilerState *state,

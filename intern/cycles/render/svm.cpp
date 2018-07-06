@@ -546,25 +546,6 @@ void SVMCompiler::generated_shared_closure_nodes(ShaderNode *root_node,
 	}
 }
 
-void SVMCompiler::generate_aov_node(ShaderNode *node,
-                                    CompilerState *state)
-{
-	/* execute dependencies for node */
-	foreach(ShaderInput *in, node->inputs) {
-		if(!node_skip_input(node, in) && in->link) {
-			ShaderNodeSet dependencies;
-			find_dependencies(dependencies, state->nodes_done, in);
-			generate_svm_nodes(dependencies, state);
-		}
-	}
-
-	/* compile node itself */
-	generate_node(node, state->nodes_done);
-
-	state->nodes_done.insert(node);
-	state->nodes_done_flag[node->id] = true;
-}
-
 void SVMCompiler::generate_multi_closure(ShaderNode *root_node,
                                          ShaderNode *node,
                                          CompilerState *state)
@@ -795,22 +776,6 @@ void SVMCompiler::compile_type(Shader *shader, ShaderGraph *graph, ShaderType ty
 
 		/* compile output node */
 		node->compile(*this);
-
-		/* Compile AOV outputs if this is the surface pass. */
-		if(type == SHADER_TYPE_SURFACE) {
-			vector<ShaderNode*> aov_outputs;
-			foreach(ShaderNode *node_iter, graph->nodes) {
-				if(node_iter->special_type == SHADER_SPECIAL_TYPE_AOV_OUTPUT) {
-					aov_outputs.push_back(node_iter);
-				}
-			}
-			if(aov_outputs.size()) {
-				add_node(NODE_END_IF_NO_AOVS, 0, 0, 0);
-				foreach(ShaderNode *aov_node, aov_outputs) {
-					generate_aov_node(aov_node, &state);
-				}
-			}
-		}
 	}
 
 	/* add node to restore state after bump shader has finished */

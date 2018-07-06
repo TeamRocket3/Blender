@@ -132,9 +132,6 @@ typedef enum ShaderNodeType {
 	NODE_TEX_VOXEL,
 	NODE_ENTER_BUMP_EVAL,
 	NODE_LEAVE_BUMP_EVAL,
-	NODE_END_IF_NO_AOVS,
-	NODE_AOV_WRITE_FLOAT,
-	NODE_AOV_WRITE_FLOAT3,
 } ShaderNodeType;
 
 typedef enum NodeAttributeType {

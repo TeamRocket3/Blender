@@ -81,8 +81,8 @@ ccl_device_inline void kernel_write_id_slots(ccl_global float *buffer, int num_s
 	}
 
 	for(int slot = 0; slot < num_slots; slot++) {
-		float *slot_id = (&buffer[slot*ID_SLOT_SIZE + 0]);
-		float *slot_weight = &buffer[slot*ID_SLOT_SIZE + 1];
+		ccl_global float *slot_id = (&buffer[slot*ID_SLOT_SIZE + 0]);
+		ccl_global float *slot_weight = &buffer[slot*ID_SLOT_SIZE + 1];
 
 		/* If the loop reaches an empty slot, the ID isn't in any slot yet - so add it! */
 		if(*slot_weight == 0.0f) {

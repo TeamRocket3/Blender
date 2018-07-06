@@ -182,7 +182,6 @@ CCL_NAMESPACE_END
 #include "kernel/svm/svm_vector_transform.h"
 #include "kernel/svm/svm_voxel.h"
 #include "kernel/svm/svm_bump.h"
-#include "kernel/svm/svm_aov.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -459,17 +458,6 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
 				break;
 			case NODE_BLACKBODY:
 				svm_node_blackbody(kg, sd, stack, node.y, node.z);
-				break;
-			case NODE_AOV_WRITE_FLOAT3:
-				svm_node_aov_write_float3(kg, state, stack, node.y, node.z, buffer);
-				break;
-			case NODE_AOV_WRITE_FLOAT:
-				svm_node_aov_write_float(kg, state, stack, node.y, node.z, buffer);
-				break;
-			case NODE_END_IF_NO_AOVS:
-				if(state->written_aovs == ~0) {
-					return;
-				}
 				break;
 #  endif  /* __EXTRA_NODES__ */
 #  if NODES_FEATURE(NODE_FEATURE_VOLUME)
