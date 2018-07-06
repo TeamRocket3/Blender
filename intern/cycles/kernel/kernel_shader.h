@@ -965,8 +965,7 @@ ccl_device float3 shader_holdout_eval(KernelGlobals *kg, ShaderData *sd)
 /* Surface Evaluation */
 
 ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
-	ccl_addr_space PathState *state, int path_flag,
-	ccl_global float *buffer)
+	ccl_addr_space PathState *state, int path_flag)
 {
 	sd->num_closure = 0;
 	sd->num_closure_extra = 0;
@@ -978,7 +977,7 @@ ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
 #endif
 	{
 #ifdef __SVM__
-		svm_eval_nodes(kg, sd, state, SHADER_TYPE_SURFACE, path_flag, buffer);
+		svm_eval_nodes(kg, sd, state, SHADER_TYPE_SURFACE, path_flag);
 #else
 		DiffuseBsdf *bsdf = (DiffuseBsdf*)bsdf_alloc(sd,
 		                                             sizeof(DiffuseBsdf),
@@ -996,7 +995,7 @@ ccl_device void shader_eval_surface(KernelGlobals *kg, ShaderData *sd,
 /* Background Evaluation */
 
 ccl_device float3 shader_eval_background(KernelGlobals *kg, ShaderData *sd,
-	ccl_addr_space PathState *state, int path_flag, ccl_global float *buffer)
+	ccl_addr_space PathState *state, int path_flag)
 {
 	sd->num_closure = 0;
 	sd->num_closure_extra = 0;
@@ -1009,7 +1008,7 @@ ccl_device float3 shader_eval_background(KernelGlobals *kg, ShaderData *sd,
 	else
 #  endif  /* __OSL__ */
 	{
-		svm_eval_nodes(kg, sd, state, SHADER_TYPE_SURFACE, path_flag, buffer);
+		svm_eval_nodes(kg, sd, state, SHADER_TYPE_SURFACE, path_flag);
 	}
 
 	float3 eval = make_float3(0.0f, 0.0f, 0.0f);
@@ -1182,7 +1181,7 @@ ccl_device_inline void shader_eval_volume(KernelGlobals *kg,
 		else
 #  endif
 		{
-			svm_eval_nodes(kg, sd, state, SHADER_TYPE_VOLUME, path_flag, NULL);
+			svm_eval_nodes(kg, sd, state, SHADER_TYPE_VOLUME, path_flag);
 		}
 #endif
 
@@ -1209,7 +1208,7 @@ ccl_device void shader_eval_displacement(KernelGlobals *kg, ShaderData *sd, ccl_
 	else
 #  endif
 	{
-		svm_eval_nodes(kg, sd, state, SHADER_TYPE_DISPLACEMENT, 0, NULL);
+		svm_eval_nodes(kg, sd, state, SHADER_TYPE_DISPLACEMENT, 0);
 	}
 #endif
 }

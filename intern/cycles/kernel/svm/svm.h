@@ -193,8 +193,7 @@ ccl_device_noinline void svm_eval_nodes(KernelGlobals *kg,
 										ShaderData *sd,
 										ccl_addr_space PathState *state,
 										ShaderType type,
-										int path_flag,
-										ccl_global float *buffer)
+										int path_flag)
 {
 	float stack[SVM_STACK_SIZE];
 	int offset = sd->shader & SHADER_MASK;

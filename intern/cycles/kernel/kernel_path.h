@@ -153,7 +153,7 @@ ccl_device_forceinline void kernel_path_background(
 
 #ifdef __BACKGROUND__
 	/* sample background shader */
-	float3 L_background = indirect_background(kg, emission_sd, state, ray, NULL);
+	float3 L_background = indirect_background(kg, emission_sd, state, ray);
 	path_radiance_accum_background(L, state, throughput, L_background);
 #endif  /* __BACKGROUND__ */
 }
@@ -286,7 +286,7 @@ ccl_device_forceinline bool kernel_path_shader_apply(
 
 			float3 bg = make_float3(0.0f, 0.0f, 0.0f);
 			if(!kernel_data.background.transparent) {
-				bg = indirect_background(kg, emission_sd, state, ray, NULL);
+				bg = indirect_background(kg, emission_sd, state, ray);
 			}
 			path_radiance_accum_shadowcatcher(L, throughput, bg);
 		}
@@ -443,7 +443,7 @@ ccl_device void kernel_path_indirect(KernelGlobals *kg,
 		                      sd,
 		                      &isect,
 		                      ray);
-		shader_eval_surface(kg, sd, state, state->flag, NULL);
+		shader_eval_surface(kg, sd, state, state->flag);
 		shader_prepare_closures(sd, state);
 
 		/* Apply shadow catcher, holdout, emission. */
@@ -594,7 +594,7 @@ ccl_device_forceinline void kernel_path_integrate(
 
 		/* Setup and evaluate shader. */
 		shader_setup_from_ray(kg, &sd, &isect, ray);
-		shader_eval_surface(kg, &sd, state, state->flag, buffer);
+		shader_eval_surface(kg, &sd, state, state->flag);
 		shader_prepare_closures(&sd, state);
 
 		/* Apply shadow catcher, holdout, emission. */
