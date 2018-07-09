@@ -118,7 +118,7 @@ private:
 	                 BL::Mesh& b_mesh,
 	                 BL::Object& b_ob,
 	                 bool motion,
-	                 int time_index = 0);
+	                 int motion_step = 0);
 	Object *sync_object(BL::Object& b_parent,
 	                    int persistent_id[OBJECT_PERSISTENT_ID_SIZE],
 	                    BL::DupliObject& b_dupli_ob,
@@ -131,6 +131,7 @@ private:
 	void sync_light(BL::Object& b_parent,
 	                int persistent_id[OBJECT_PERSISTENT_ID_SIZE],
 	                BL::Object& b_ob,
+	                BL::DupliObject& b_dupli_ob,
 	                Transform& tfm,
 	                bool *use_portal);
 	void sync_background_light(bool use_portal);
@@ -213,4 +214,3 @@ private:
 CCL_NAMESPACE_END
 
 #endif /* __BLENDER_SYNC_H__ */
-

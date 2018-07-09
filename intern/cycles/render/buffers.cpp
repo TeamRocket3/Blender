@@ -19,10 +19,8 @@
 #include "render/buffers.h"
 #include "device/device.h"
 
-#include "util/util_debug.h"
 #include "util/util_foreach.h"
 #include "util/util_hash.h"
-#include "util/util_image.h"
 #include "util/util_math.h"
 #include "util/util_opengl.h"
 #include "util/util_time.h"
@@ -90,7 +88,7 @@ RenderTile::RenderTile()
 
 RenderBuffers::RenderBuffers(Device *device)
 : buffer(device, "RenderBuffers", MEM_READ_WRITE),
-  map_neighbor_copied(false)
+  map_neighbor_copied(false), render_time(0.0f)
 {
 }
 
@@ -125,6 +123,10 @@ bool RenderBuffers::copy_from_device()
 
 bool RenderBuffers::get_denoising_pass_rect(int offset, float exposure, int sample, int components, float *pixels)
 {
+	if(buffer.data() == NULL) {
+		return false;
+	}
+
 	float invsample = 1.0f/sample;
 	float scale = invsample;
 	bool variance = (offset == DENOISING_PASS_NORMAL_VAR) ||
@@ -147,8 +149,8 @@ bool RenderBuffers::get_denoising_pass_rect(int offset, float exposure, int samp
 		/* Approximate variance as E[x^2] - 1/N * (E[x])^2, since online variance
 		 * update does not work efficiently with atomics in the kernel. */
 		int mean_offset = offset - components;
-		float *mean = (float*)buffer.data_pointer + mean_offset;
-		float *var = (float*)buffer.data_pointer + offset;
+		float *mean = buffer.data() + mean_offset;
+		float *var = buffer.data() + offset;
 		assert(mean_offset >= 0);
 
 		if(components == 1) {
@@ -168,7 +170,7 @@ bool RenderBuffers::get_denoising_pass_rect(int offset, float exposure, int samp
 		}
 	}
 	else {
-		float *in = (float*)buffer.data_pointer + offset;
+		float *in = buffer.data() + offset;
 
 		if(components == 1) {
 			for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
@@ -192,6 +194,10 @@ bool RenderBuffers::get_denoising_pass_rect(int offset, float exposure, int samp
 
 bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int components, float *pixels)
 {
+	if(buffer.data() == NULL) {
+		return false;
+	}
+
 	int pass_offset = 0;
 
 	Pass *pass = params.passes.get_pass(type, pass_offset);
@@ -199,7 +205,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 		return false;
 	}
 	
-	float *in = (float*)buffer.data_pointer + pass_offset;
+	float *in = (float*)buffer.data() + pass_offset;
 	int pass_stride = params.passes.get_size();
 	
 	float scale = (pass->filter)? 1.0f/(float)sample: 1.0f;
@@ -207,10 +213,17 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 	
 	int size = params.width*params.height;
 	
-	if(components == 1) {
+	if(components == 1 && type == PASS_RENDER_TIME) {
+		/* Render time is not stored by kernel, but measured per tile. */
+		float val = (float)(1000.0 * render_time / (params.width * params.height * sample));
+		for(int i = 0; i < size; i++, pixels++) {
+			pixels[0] = val;
+		}
+	}
+	else if(components == 1) {
 		assert(pass->components == components);
 		
-		/* scalar */
+		/* Scalar */
 		if(type == PASS_DEPTH) {
 			for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
 				float f = *in;
@@ -260,7 +273,7 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 			/* RGB lighting passes that need to divide out color */
 			params.passes.get_pass(pass->divide_type, pass_offset);
 			
-			float *in_divide = (float*)buffer.data_pointer + pass_offset;
+			float *in_divide = (float*)buffer.data() + pass_offset;
 			
 			for(int i = 0; i < size; i++, in += pass_stride, in_divide += pass_stride, pixels += 3) {
 				float3 f = make_float3(in[0], in[1], in[2]);
@@ -298,13 +311,13 @@ bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int
 				pixels[2] = f.z*invw;
 				pixels[3] = 1.0f;
 			}
-			}
-			else if(type == PASS_MOTION) {
+		}
+		else if(type == PASS_MOTION) {
 			/* need to normalize by number of samples accumulated for motion */
 			
 			params.passes.get_pass(PASS_MOTION_WEIGHT, pass_offset);
 			
-			float *in_weight = (float*)buffer.data_pointer + pass_offset;
+			float *in_weight = (float*)buffer.data() + pass_offset;
 
 			for(int i = 0; i < size; i++, in += pass_stride, in_weight += pass_stride, pixels += 4) {
 				float4 f = make_float4(in[0], in[1], in[2], in[3]);
@@ -391,38 +404,6 @@ bool DisplayBuffer::draw_ready()
 	return (draw_width != 0 && draw_height != 0);
 }
 
-void DisplayBuffer::write(const string& filename)
-{
-	int w = draw_width;
-	int h = draw_height;
-
-	if(w == 0 || h == 0)
-		return;
-	
-	if(half_float)
-		return;
-
-	/* read buffer from device */
-	uchar4 *pixels = rgba_byte.copy_from_device(0, w, h);
-
-	/* write image */
-	ImageOutput *out = ImageOutput::create(filename);
-	ImageSpec spec(w, h, 4, TypeDesc::UINT8);
-
-	out->open(filename, spec);
-
-	/* conversion for different top/bottom convention */
-	out->write_image(TypeDesc::UINT8,
-		(uchar*)(pixels + (h-1)*w),
-		AutoStride,
-		-w*sizeof(uchar4),
-		AutoStride);
-
-	out->close();
-
-	delete out;
-}
-
 bool RenderBuffers::get_aov_rect(ustring name, float exposure, int sample, int components, float *pixels)
 {
 	int aov_offset = 0;
@@ -433,7 +414,7 @@ bool RenderBuffers::get_aov_rect(ustring name, float exposure, int sample, int c
 		return false;
 	}
 
-	float *in = (float*)buffer.data_pointer + aov_offset;
+	float *in = (float*)buffer.data() + aov_offset;
 	int pass_stride = params.passes.get_size();
 
 	float scale = (aov->type == AOV_RGB) ? exposure / sample : 1.0f / (float)sample; /* TODO has_exposure */

@@ -310,6 +310,17 @@ ccl_device_inline float4 float3_to_float4(const float3 a)
 	return make_float4(a.x, a.y, a.z, 1.0f);
 }
 
+ccl_device_inline float inverse_lerp(float a, float b, float x)
+{
+	return (x - a) / (b - a);
+}
+
+/* Cubic interpolation between b and c, a and d are the previous and next point. */
+ccl_device_inline float cubic_interp(float a, float b, float c, float d, float x)
+{
+	return 0.5f*(((d + 3.0f*(b-c) - a)*x + (2.0f*a - 5.0f*b + 4.0f*c - d))*x + (c - a))*x + b;
+}
+
 CCL_NAMESPACE_END
 
 #include "util/util_math_int2.h"
@@ -319,6 +330,8 @@ CCL_NAMESPACE_END
 #include "util/util_math_float2.h"
 #include "util/util_math_float3.h"
 #include "util/util_math_float4.h"
+
+#include "util/util_rect.h"
 
 CCL_NAMESPACE_BEGIN
 
@@ -516,6 +529,11 @@ ccl_device float safe_logf(float a, float b)
 ccl_device float safe_modulo(float a, float b)
 {
 	return (b != 0.0f)? fmodf(a, b): 0.0f;
+}
+
+ccl_device_inline float sqr(float a)
+{
+	return a * a;
 }
 
 ccl_device_inline float beta(float x, float y)

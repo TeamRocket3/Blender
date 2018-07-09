@@ -82,6 +82,7 @@ public:
 	Pass* get_pass(PassType type, int &offset);
 	AOV* get_aov(ustring name, int &offset);
 
+	bool equals(const PassSettings &b) const;
 	bool contains(PassType type) const;
 	void add(PassType type);
 	void add(AOV aov);
@@ -138,4 +139,3 @@ public:
 CCL_NAMESPACE_END
 
 #endif /* __FILM_H__ */
-

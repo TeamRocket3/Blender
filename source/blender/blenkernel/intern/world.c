@@ -43,7 +43,6 @@
 #include "BLI_listbase.h"
 
 #include "BKE_animsys.h"
-#include "BKE_global.h"
 #include "BKE_icons.h"
 #include "BKE_library.h"
 #include "BKE_library_query.h"
@@ -73,7 +72,7 @@ void BKE_world_free(World *wrld)
 	}
 
 	GPU_material_free(&wrld->gpumaterial);
-	
+
 	BKE_icon_id_delete((struct ID *)wrld);
 	BKE_previewimg_free(&wrld->preview);
 }
@@ -102,13 +101,13 @@ void BKE_world_init(World *wrld)
 	wrld->aobias = 0.05f;
 	wrld->ao_samp_method = WO_AOSAMP_HAMMERSLEY;
 	wrld->ao_approx_error = 0.25f;
-	
+
 	wrld->preview = NULL;
 	wrld->miststa = 5.0f;
 	wrld->mistdist = 25.0f;
 }
 
-World *add_world(Main *bmain, const char *name)
+World *BKE_world_add(Main *bmain, const char *name)
 {
 	World *wrld;
 
@@ -158,7 +157,7 @@ World *BKE_world_copy(Main *bmain, const World *wrld)
 	return wrld_copy;
 }
 
-World *localize_world(World *wrld)
+World *BKE_world_localize(World *wrld)
 {
 	/* TODO replace with something like
 	 * 	World *wrld_copy;
@@ -169,23 +168,23 @@ World *localize_world(World *wrld)
 
 	World *wrldn;
 	int a;
-	
+
 	wrldn = BKE_libblock_copy_nolib(&wrld->id, false);
-	
+
 	for (a = 0; a < MAX_MTEX; a++) {
 		if (wrld->mtex[a]) {
-			wrldn->mtex[a] = MEM_mallocN(sizeof(MTex), "localize_world");
+			wrldn->mtex[a] = MEM_mallocN(sizeof(MTex), __func__);
 			memcpy(wrldn->mtex[a], wrld->mtex[a], sizeof(MTex));
 		}
 	}
 
 	if (wrld->nodetree)
 		wrldn->nodetree = ntreeLocalize(wrld->nodetree);
-	
+
 	wrldn->preview = NULL;
-	
+
 	BLI_listbase_clear(&wrldn->gpumaterial);
-	
+
 	return wrldn;
 }
 

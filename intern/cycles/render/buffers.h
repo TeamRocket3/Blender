@@ -71,6 +71,7 @@ public:
 	/* float buffer */
 	device_vector<float> buffer;
 	bool map_neighbor_copied;
+	double render_time;
 
 	explicit RenderBuffers(Device *device);
 	~RenderBuffers();
@@ -109,7 +110,6 @@ public:
 	~DisplayBuffer();
 
 	void reset(BufferParams& params);
-	void write(const string& filename);
 
 	void draw_set(int width, int height);
 	void draw(Device *device, const DeviceDrawParams& draw_params);
@@ -134,6 +134,7 @@ public:
 	int tile_index;
 
 	device_ptr buffer;
+	int device_size;
 
 	RenderBuffers *buffers;
 
@@ -143,4 +144,3 @@ public:
 CCL_NAMESPACE_END
 
 #endif /* __BUFFERS_H__ */
-

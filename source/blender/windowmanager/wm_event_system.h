@@ -4,7 +4,7 @@
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
- * of the License, or (at your option) any later version. 
+ * of the License, or (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -18,7 +18,7 @@
  * The Original Code is Copyright (C) 2007 Blender Foundation.
  * All rights reserved.
  *
- * 
+ *
  * Contributor(s): Blender Foundation
  *
  * ***** END GPL LICENSE BLOCK *****
@@ -71,7 +71,7 @@ typedef struct wmEventHandler {
 
 } wmEventHandler;
 
-/* custom types for handlers, for signalling, freeing */
+/* custom types for handlers, for signaling, freeing */
 enum {
 	WM_HANDLER_DEFAULT,
 	WM_HANDLER_FILESELECT
@@ -98,4 +98,3 @@ void        wm_drags_check_ops(bContext *C, const wmEvent *event);
 void        wm_drags_draw(bContext *C, wmWindow *win, rcti *rect);
 
 #endif /* __WM_EVENT_SYSTEM_H__ */
-

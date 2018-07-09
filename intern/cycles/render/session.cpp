@@ -55,7 +55,7 @@ Session::Session(const SessionParams& params_)
 
 	device = Device::create(params.device, stats, params.background);
 
-	if(params.background && params.output_path.empty()) {
+	if(params.background && !params.write_render_cb) {
 		buffers = NULL;
 		display = NULL;
 	}
@@ -101,7 +101,7 @@ Session::~Session()
 		wait();
 	}
 
-	if(!params.output_path.empty()) {
+	if(params.write_render_cb) {
 		/* tonemap and write out image if requested */
 		delete display;
 
@@ -109,8 +109,10 @@ Session::~Session()
 		display->reset(buffers->params);
 		tonemap(params.samples);
 
-		progress.set_status("Writing Image", params.output_path);
-		display->write(params.output_path);
+		int w = display->draw_width;
+		int h = display->draw_height;
+		uchar4 *pixels = display->rgba_byte.copy_from_device(0, w, h);
+		params.write_render_cb((uchar*)pixels, w, h, 4);
 	}
 
 	/* clean up */
@@ -362,7 +364,7 @@ bool Session::acquire_tile(Device *tile_device, RenderTile& rtile)
 
 	if(!tile_manager.next_tile(tile, device_num))
 		return false;
-	
+
 	/* fill render tile */
 	rtile.x = tile_manager.state.buffer.full_x + tile->x;
 	rtile.y = tile_manager.state.buffer.full_y + tile->y;
@@ -500,6 +502,9 @@ void Session::map_neighbor_tiles(RenderTile *tiles, Device *tile_device)
 
 	assert(tiles[4].buffers);
 	device->map_neighbor_tiles(tile_device, tiles);
+
+	/* The denoised result is written back to the original tile. */
+	tiles[9] = tiles[4];
 }
 
 void Session::unmap_neighbor_tiles(RenderTile *tiles, Device *tile_device)
@@ -642,13 +647,11 @@ DeviceRequestedFeatures Session::get_requested_device_features()
 	DeviceRequestedFeatures requested_features;
 	requested_features.experimental = params.experimental;
 
-	requested_features.max_closure = get_max_closure_count();
 	scene->shader_manager->get_requested_features(
 	        scene,
 	        &requested_features);
 	if(!params.background) {
 		/* Avoid too much re-compilations for viewport render. */
-		requested_features.max_closure = 64;
 		requested_features.max_nodes_group = NODE_GROUP_LEVEL_MAX;
 		requested_features.nodes_features = NODE_FEATURE_ALL;
 	}
@@ -658,13 +661,13 @@ DeviceRequestedFeatures Session::get_requested_device_features()
 	 */
 	requested_features.use_hair = false;
 	requested_features.use_object_motion = false;
-	requested_features.use_camera_motion = scene->camera->use_motion;
+	requested_features.use_camera_motion = scene->camera->use_motion();
 	foreach(Object *object, scene->objects) {
 		Mesh *mesh = object->mesh;
 		if(mesh->num_curves()) {
 			requested_features.use_hair = true;
 		}
-		requested_features.use_object_motion |= object->use_motion | mesh->use_motion_blur;
+		requested_features.use_object_motion |= object->use_motion() | mesh->use_motion_blur;
 		requested_features.use_camera_motion |= mesh->use_motion_blur;
 #ifdef WITH_OPENSUBDIV
 		if(mesh->subdivision_type != Mesh::SUBDIVISION_NONE) {
@@ -858,6 +861,16 @@ void Session::update_scene()
 	if(scene->need_update()) {
 		load_kernels(false);
 
+		/* Update max_closures. */
+		KernelIntegrator *kintegrator = &scene->dscene.data.integrator;
+		if(params.background) {
+			kintegrator->max_closures = get_max_closure_count();
+		}
+		else {
+			/* Currently viewport render is faster with higher max_closures, needs investigating. */
+			kintegrator->max_closures = 64;
+		}
+
 		progress.set_status("Updating Scene");
 		MEM_GUARDED_CALL(&progress, scene->device_update, device, progress);
 	}
@@ -903,7 +916,7 @@ void Session::update_status_time(bool show_pause, bool show_done)
 		substatus = string_printf("Path Tracing Sample %d/%d",
 		                          progressive_sample+1,
 		                          num_samples);
-	
+
 	if(show_pause) {
 		status = "Paused";
 	}
@@ -928,7 +941,7 @@ void Session::render()
 
 	/* Add path trace task. */
 	DeviceTask task(DeviceTask::RENDER);
-	
+
 	task.acquire_tile = function_bind(&Session::acquire_tile, this, _1, _2);
 	task.release_tile = function_bind(&Session::release_tile, this, _1);
 	task.map_neighbor_tiles = function_bind(&Session::map_neighbor_tiles, this, _1, _2);

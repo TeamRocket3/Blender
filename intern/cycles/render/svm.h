@@ -96,7 +96,9 @@ public:
 		string full_report() const;
 	};
 
-	SVMCompiler(ShaderManager *shader_manager, ImageManager *image_manager, Film *film);
+	SVMCompiler(ShaderManager *shader_manager,
+	            ImageManager *image_manager,
+	            LightManager *light_manager);
 	void compile(Scene *scene,
 	             Shader *shader,
 	             array<int4>& svm_nodes,
@@ -118,6 +120,7 @@ public:
 	void add_node(const float4& f);
 	uint attribute(ustring name);
 	uint attribute(AttributeStandard std);
+	uint attribute_standard(ustring name);
 	uint encode_uchar4(uint x, uint y = 0, uint z = 0, uint w = 0);
 	uint closure_mix_weight_offset() { return mix_weight_offset; }
 
@@ -125,7 +128,7 @@ public:
 
 	ImageManager *image_manager;
 	ShaderManager *shader_manager;
-	Film *film;
+	LightManager *light_manager;
 	bool background;
 
 protected:
@@ -222,4 +225,3 @@ protected:
 CCL_NAMESPACE_END
 
 #endif /* __SVM_H__ */
-

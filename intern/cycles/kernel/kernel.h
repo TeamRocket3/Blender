@@ -40,7 +40,7 @@ bool kernel_osl_use(KernelGlobals *kg);
 void kernel_const_copy(KernelGlobals *kg, const char *name, void *host, size_t size);
 void kernel_tex_copy(KernelGlobals *kg,
                      const char *name,
-                     device_ptr mem,
+                     void *mem,
                      size_t size);
 
 #define KERNEL_ARCH cpu
@@ -64,4 +64,3 @@ void kernel_tex_copy(KernelGlobals *kg,
 CCL_NAMESPACE_END
 
 #endif /* __KERNEL_H__ */
-

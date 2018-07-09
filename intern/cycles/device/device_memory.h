@@ -21,7 +21,6 @@
  *
  * Data types for allocating, copying and freeing device memory. */
 
-#include "util/util_debug.h"
 #include "util/util_half.h"
 #include "util/util_texture.h"
 #include "util/util_types.h"
@@ -34,6 +33,7 @@ class Device;
 enum MemoryType {
 	MEM_READ_ONLY,
 	MEM_READ_WRITE,
+	MEM_DEVICE_ONLY,
 	MEM_TEXTURE,
 	MEM_PIXELS
 };
@@ -43,6 +43,7 @@ enum MemoryType {
 enum DataType {
 	TYPE_UNKNOWN,
 	TYPE_UCHAR,
+	TYPE_UINT16,
 	TYPE_UINT,
 	TYPE_INT,
 	TYPE_FLOAT,
@@ -50,13 +51,14 @@ enum DataType {
 	TYPE_UINT64,
 };
 
-static inline size_t datatype_size(DataType datatype) 
+static inline size_t datatype_size(DataType datatype)
 {
 	switch(datatype) {
 		case TYPE_UNKNOWN: return 1;
 		case TYPE_UCHAR: return sizeof(uchar);
 		case TYPE_FLOAT: return sizeof(float);
 		case TYPE_UINT: return sizeof(uint);
+		case TYPE_UINT16: return sizeof(uint16_t);
 		case TYPE_INT: return sizeof(int);
 		case TYPE_HALF: return sizeof(half);
 		case TYPE_UINT64: return sizeof(uint64_t);
@@ -156,6 +158,16 @@ template<> struct device_type_traits<half> {
 	static const int num_elements = 1;
 };
 
+template<> struct device_type_traits<ushort4> {
+	static const DataType data_type = TYPE_UINT16;
+	static const int num_elements = 4;
+};
+
+template<> struct device_type_traits<uint16_t> {
+	static const DataType data_type = TYPE_UINT16;
+	static const int num_elements = 1;
+};
+
 template<> struct device_type_traits<half4> {
 	static const DataType data_type = TYPE_HALF;
 	static const int num_elements = 4;
@@ -182,7 +194,6 @@ public:
 	/* Data information. */
 	DataType data_type;
 	int data_elements;
-	device_ptr data_pointer;
 	size_t data_size;
 	size_t device_size;
 	size_t data_width;
@@ -193,13 +204,20 @@ public:
 	InterpolationType interpolation;
 	ExtensionType extension;
 
-	/* Device pointer. */
+	/* Pointers. */
 	Device *device;
 	device_ptr device_pointer;
+	void *host_pointer;
+	void *shared_pointer;
 
 	virtual ~device_memory();
 
+	void swap_device(Device *new_device, size_t new_device_size, device_ptr new_device_ptr);
+	void restore_device();
+
 protected:
+	friend class CUDADevice;
+
 	/* Only create through subclasses. */
 	device_memory(Device *device, const char *name, MemoryType type);
 
@@ -207,11 +225,11 @@ protected:
 	device_memory(const device_memory&);
 	device_memory& operator = (const device_memory&);
 
-	/* Host allocation on the device. All data_pointer memory should be
+	/* Host allocation on the device. All host_pointer memory should be
 	 * allocated with these functions, for devices that support using
 	 * the same pointer for host and device. */
-	device_ptr host_alloc(size_t size);
-	void host_free(device_ptr ptr, size_t size);
+	void *host_alloc(size_t size);
+	void host_free();
 
 	/* Device memory allocation and copying. */
 	void device_alloc();
@@ -219,6 +237,10 @@ protected:
 	void device_copy_to();
 	void device_copy_from(int y, int w, int h, int elem);
 	void device_zero();
+
+	device_ptr original_device_ptr;
+	size_t original_device_size;
+	Device *original_device;
 };
 
 /* Device Only Memory
@@ -231,7 +253,7 @@ class device_only_memory : public device_memory
 {
 public:
 	device_only_memory(Device *device, const char *name)
-	: device_memory(device, name, MEM_READ_WRITE)
+	: device_memory(device, name, MEM_DEVICE_ONLY)
 	{
 		data_type = device_type_traits<T>::data_type;
 		data_elements = max(device_type_traits<T>::num_elements, 1);
@@ -242,15 +264,29 @@ public:
 		free();
 	}
 
-	void alloc_to_device(size_t num)
+	void alloc_to_device(size_t num, bool shrink_to_fit = true)
 	{
-		data_size = num*sizeof(T);
-		device_alloc();
+		size_t new_size = num;
+		bool reallocate;
+
+		if(shrink_to_fit) {
+			reallocate = (data_size != new_size);
+		}
+		else {
+			reallocate = (data_size < new_size);
+		}
+
+		if(reallocate) {
+			device_free();
+			data_size = new_size;
+			device_alloc();
+		}
 	}
 
 	void free()
 	{
 		device_free();
+		data_size = 0;
 	}
 
 	void zero_to_device()
@@ -294,8 +330,8 @@ public:
 
 		if(new_size != data_size) {
 			device_free();
-			host_free(data_pointer, sizeof(T)*data_size);
-			data_pointer = host_alloc(sizeof(T)*new_size);
+			host_free();
+			host_pointer = host_alloc(sizeof(T)*new_size);
 			assert(device_pointer == 0);
 		}
 
@@ -304,7 +340,7 @@ public:
 		data_height = height;
 		data_depth = depth;
 
-		return get_data();
+		return data();
 	}
 
 	/* Host memory resize. Only use this if the original data needs to be
@@ -314,16 +350,16 @@ public:
 		size_t new_size = size(width, height, depth);
 
 		if(new_size != data_size) {
-			device_ptr new_ptr = host_alloc(sizeof(T)*new_size);
+			void *new_ptr = host_alloc(sizeof(T)*new_size);
 
 			if(new_size && data_size) {
 				size_t min_size = ((new_size < data_size)? new_size: data_size);
-				memcpy((T*)new_ptr, (T*)data_pointer, sizeof(T)*min_size);
+				memcpy((T*)new_ptr, (T*)host_pointer, sizeof(T)*min_size);
 			}
 
 			device_free();
-			host_free(data_pointer, sizeof(T)*data_size);
-			data_pointer = new_ptr;
+			host_free();
+			host_pointer = new_ptr;
 			assert(device_pointer == 0);
 		}
 
@@ -332,20 +368,20 @@ public:
 		data_height = height;
 		data_depth = depth;
 
-		return get_data();
+		return data();
 	}
 
 	/* Take over data from an existing array. */
 	void steal_data(array<T>& from)
 	{
 		device_free();
-		host_free(data_pointer, sizeof(T)*data_size);
+		host_free();
 
 		data_size = from.size();
 		data_width = 0;
 		data_height = 0;
 		data_depth = 0;
-		data_pointer = (device_ptr)from.steal_pointer();
+		host_pointer = from.steal_pointer();
 		assert(device_pointer == 0);
 	}
 
@@ -353,13 +389,13 @@ public:
 	void free()
 	{
 		device_free();
-		host_free(data_pointer, sizeof(T)*data_size);
+		host_free();
 
 		data_size = 0;
 		data_width = 0;
 		data_height = 0;
 		data_depth = 0;
-		data_pointer = 0;
+		host_pointer = 0;
 		assert(device_pointer == 0);
 	}
 
@@ -368,15 +404,15 @@ public:
 		return data_size;
 	}
 
-	T* get_data()
+	T* data()
 	{
-		return (T*)data_pointer;
+		return (T*)host_pointer;
 	}
 
 	T& operator[](size_t i)
 	{
 		assert(i < data_size);
-		return get_data()[i];
+		return data()[i];
 	}
 
 	void copy_to_device()
@@ -417,13 +453,16 @@ public:
 	void alloc_to_device(size_t width, size_t height, size_t depth = 0)
 	{
 		device_vector<T>::alloc(width, height, depth);
-		device_memory::device_alloc();
+
+		if(!device_memory::device_pointer) {
+			device_memory::device_alloc();
+		}
 	}
 
 	T *copy_from_device(int y, int w, int h)
 	{
 		device_memory::device_copy_from(y, w, h, sizeof(T));
-		return device_vector<T>::get_data();
+		return device_vector<T>::data();
 	}
 };
 
@@ -458,4 +497,3 @@ protected:
 CCL_NAMESPACE_END
 
 #endif /* __DEVICE_MEMORY_H__ */
-

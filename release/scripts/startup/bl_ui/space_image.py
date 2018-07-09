@@ -104,7 +104,11 @@ class IMAGE_MT_view(Menu):
         ratios = ((1, 8), (1, 4), (1, 2), (1, 1), (2, 1), (4, 1), (8, 1))
 
         for a, b in ratios:
-            layout.operator("image.view_zoom_ratio", text=iface_("Zoom %d:%d") % (a, b), translate=False).ratio = a / b
+            layout.operator(
+                "image.view_zoom_ratio",
+                text=iface_(f"Zoom {a:d}:{b:d}"),
+                translate=False,
+            ).ratio = a / b
 
         layout.separator()
 
@@ -552,6 +556,7 @@ from .properties_mask_common import (
     MASK_PT_point,
     MASK_PT_display,
     MASK_PT_tools,
+    MASK_PT_add,
 )
 
 
@@ -578,6 +583,21 @@ class IMAGE_PT_active_mask_spline(MASK_PT_spline, Panel):
 class IMAGE_PT_active_mask_point(MASK_PT_point, Panel):
     bl_space_type = 'IMAGE_EDITOR'
     bl_region_type = 'UI'
+
+
+class IMAGE_PT_tools_mask(MASK_PT_tools, Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'TOOLS'
+    bl_category = 'Mask'
+
+
+class IMAGE_PT_tools_mask_add(MASK_PT_add, Panel):
+    bl_space_type = 'IMAGE_EDITOR'
+    bl_region_type = 'TOOLS'
+    bl_category = 'Mask'
+
+
+# --- end mask ---
 
 
 class IMAGE_PT_image_properties(Panel):
@@ -1158,14 +1178,6 @@ class IMAGE_PT_uv_sculpt(Panel, ImagePaintPanel):
         col.prop(uvsculpt, "show_brush")
 
 
-class IMAGE_PT_tools_mask(MASK_PT_tools, Panel):
-    bl_space_type = 'IMAGE_EDITOR'
-    bl_region_type = 'TOOLS'
-    bl_category = 'Mask'
-
-# --- end mask ---
-
-
 class IMAGE_PT_options_uvs(Panel, UVToolsPanel):
     bl_label = "UV Options"
     bl_category = "Options"
@@ -1348,6 +1360,7 @@ classes = (
     IMAGE_HT_header,
     MASK_MT_editor_menus,
     IMAGE_PT_mask,
+    IMAGE_PT_tools_mask_add,
     IMAGE_PT_mask_layers,
     IMAGE_PT_mask_display,
     IMAGE_PT_active_mask_spline,

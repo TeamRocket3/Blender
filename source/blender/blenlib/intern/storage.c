@@ -37,7 +37,7 @@
 
 #include <sys/stat.h>
 
-#if defined(__NetBSD__) || defined(__DragonFly__)
+#if defined(__NetBSD__) || defined(__DragonFly__) || defined(__HAIKU__)
    /* Other modern unix os's should probably use this also */
 #  include <sys/statvfs.h>
 #  define USE_STATFS_STATVFS
@@ -185,7 +185,7 @@ size_t BLI_file_size(const char *path)
 }
 
 /**
- * Returns the st_mode from statting the specified path name, or 0 if it couldn't be statted
+ * Returns the st_mode from stat-ing the specified path name, or 0 if stat fails
  * (most likely doesn't exist or no access).
  */
 int BLI_exists(const char *name)
@@ -389,11 +389,7 @@ LinkNode *BLI_file_read_as_lines(const char *name)
 		for (i = 0; i <= size; i++) {
 			if (i == size || buf[i] == '\n') {
 				char *line = BLI_strdupn(&buf[last], i - last);
-
 				BLI_linklist_append(&lines, line);
-				/* faster to build singly-linked list in reverse order */
-				/* alternatively, could process buffer in reverse order so
-				 * list ends up right way round to start with */
 				last = i + 1;
 			}
 		}

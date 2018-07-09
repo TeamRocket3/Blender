@@ -26,6 +26,7 @@
 setup_libdirs()
 
 blender_include_dirs(
+	../../intern/clog
 	../../intern/guardedalloc
 	../../intern/glew-mx
 	../blender/blenlib
@@ -264,14 +265,29 @@ endif()
 set(BLENDER_TEXT_FILES
 	${CMAKE_SOURCE_DIR}/release/text/GPL-license.txt
 	${CMAKE_SOURCE_DIR}/release/text/GPL3-license.txt
-	${CMAKE_SOURCE_DIR}/release/text/Python-license.txt
 	${CMAKE_SOURCE_DIR}/release/text/copyright.txt
-	${CMAKE_SOURCE_DIR}/release/text/jemalloc-license.txt
-	${CMAKE_SOURCE_DIR}/release/text/ocio-license.txt
 	# generate this file
 	# ${CMAKE_SOURCE_DIR}/release/text/readme.html
 	${CMAKE_SOURCE_DIR}/release/datafiles/LICENSE-bfont.ttf.txt
 )
+
+if(WITH_PYTHON)
+	list(APPEND BLENDER_TEXT_FILES
+		${CMAKE_SOURCE_DIR}/release/text/Python-license.txt
+	)
+endif()
+
+if(WITH_OPENCOLORIO)
+	list(APPEND BLENDER_TEXT_FILES
+		${CMAKE_SOURCE_DIR}/release/text/ocio-license.txt
+	)
+endif()
+
+if(WITH_MEM_JEMALLOC)
+	list(APPEND BLENDER_TEXT_FILES
+		${CMAKE_SOURCE_DIR}/release/text/jemalloc-license.txt
+	)
+endif()
 
 if(WITH_INTERNATIONAL)
 	list(APPEND BLENDER_TEXT_FILES
@@ -325,7 +341,7 @@ install(
 
 if(WITH_PYTHON)
 	# install(CODE "message(\"copying blender scripts...\")")
-	
+
 	# exclude addons_contrib if release
 	if("${BLENDER_VERSION_CYCLE}" STREQUAL "release" OR
 	   "${BLENDER_VERSION_CYCLE}" STREQUAL "rc")
@@ -351,7 +367,7 @@ if(WITH_PYTHON)
 		PATTERN "${ADDON_EXCLUDE_CONDITIONAL}" EXCLUDE
 		PATTERN "${FREESTYLE_EXCLUDE_CONDITIONAL}" EXCLUDE
 	)
-	
+
 	unset(ADDON_EXCLUDE_CONDITIONAL)
 	unset(FREESTYLE_EXCLUDE_CONDITIONAL)
 endif()
@@ -631,7 +647,7 @@ if(UNIX AND NOT APPLE)
 				unset(_suffix)
 			endif()
 			unset(_target_LIB)
-			
+
 		endif()
 	endif()
 elseif(WIN32)
@@ -795,7 +811,7 @@ elseif(WIN32)
 			DESTINATION "."
 		)
 	endif()
-	
+
 	if(WITH_SYSTEM_AUDASPACE)
 		install(
 			FILES
@@ -812,7 +828,7 @@ elseif(WIN32)
 			DESTINATION "."
 		)
 	endif()
-		
+
 	install( # x86 builds can run on x64 Windows, so this is required at all times
 		FILES ${LIBDIR}/thumbhandler/lib/BlendThumb64.dll
 		DESTINATION "."
@@ -864,8 +880,8 @@ elseif(APPLE)
 
 	set_target_properties(blender PROPERTIES
 		MACOSX_BUNDLE_INFO_PLIST ${OSX_APP_SOURCEDIR}/Contents/Info.plist
-		MACOSX_BUNDLE_SHORT_VERSION_STRING ${BLENDER_VERSION}
-		MACOSX_BUNDLE_LONG_VERSION_STRING "${BLENDER_VERSION} ${BLENDER_DATE}")
+		MACOSX_BUNDLE_SHORT_VERSION_STRING "${BLENDER_VERSION}${BLENDER_VERSION_CHAR}"
+		MACOSX_BUNDLE_LONG_VERSION_STRING "${BLENDER_VERSION}${BLENDER_VERSION_CHAR} ${BLENDER_DATE}")
 
 	# Gather the date in finder-style
 	execute_process(COMMAND date "+%m/%d/%Y/%H:%M"
@@ -893,18 +909,6 @@ elseif(APPLE)
 		${OSX_APP_SOURCEDIR}/Contents/Resources
 		blender.app/Contents/
 	)
-
-	if(WITH_OPENMP AND CMAKE_C_COMPILER_ID MATCHES "Clang" AND NOT ${CMAKE_C_COMPILER_VERSION} VERSION_LESS '3.4')
-		install(
-			FILES ${LIBDIR}/openmp/lib/libiomp5.dylib
-			DESTINATION blender.app/Contents/Resources/lib/
-		)
-		install(
-			FILES ${LIBDIR}/openmp/LICENSE.txt
-			DESTINATION "."
-			RENAME LICENSE-libiomp5.txt
-		)
-	endif()
 
 	if(WITH_LLVM AND NOT LLVM_STATIC)
 		install(
@@ -935,7 +939,7 @@ elseif(APPLE)
 		)
 		unset(_py_inc_suffix)
 	endif()
-	
+
 	# install blenderplayer bundle - copy of blender.app above. re-using macros et al
 	# note we are using OSX Bundle as base and copying Blender dummy bundle on top of it
 	if(WITH_GAMEENGINE AND WITH_PLAYER)
@@ -1036,70 +1040,4 @@ if(WIN32 AND NOT WITH_PYTHON_MODULE)
 		COMPONENT Blender
 		DESTINATION "."
 	)
-	if(CMAKE_CL_64)
-		set(_WIN_PLATFORM x64)
-	else()
-		set(_WIN_PLATFORM x86)
-	endif()
-	if(MSVC12_REDIST_DIR)
-		install(
-			FILES
-				${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.CRT/msvcp120.dll
-				${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.CRT/msvcr120.dll
-			DESTINATION "."
-		)
-		if(WITH_OPENMP)
-			install(
-				FILES ${MSVC12_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC120.OpenMP/vcomp120.dll
-				DESTINATION "."
-			)
-		endif()
-	endif()
-	
-	if(MSVC14_REDIST_DIR)
-		set(KITSDIRx86 "$ENV{${ProgramFilesX86_NAME}}/Windows Kits/10/")
-		set(KITSDIR "$ENV{ProgramFiles}/Windows Kits/10/")
-		if(IS_DIRECTORY ${KITSDIR})
-			set(KITSPATH "${KITSDIR}/Redist/ucrt/DLLs/${_WIN_PLATFORM}")
-		else()
-			if(IS_DIRECTORY ${KITSDIRx86})
-				set(KITSPATH "${KITSDIRx86}/Redist/ucrt/DLLs/${_WIN_PLATFORM}")
-			else()
-				message(FATAL_ERROR "Windows 10 SDK directory not found")
-			endif()
-		endif()
-		FILE(TO_CMAKE_PATH  ${KITSPATH} KITSPATH)
-		install(
-			FILES
-				${KITSPATH}/api-ms-win-core-file-l1-2-0.dll
-				${KITSPATH}/api-ms-win-core-file-l2-1-0.dll
-				${KITSPATH}/api-ms-win-core-localization-l1-2-0.dll
-				${KITSPATH}/api-ms-win-core-processthreads-l1-1-0.dll
-				${KITSPATH}/api-ms-win-core-processthreads-l1-1-1.dll
-				${KITSPATH}/api-ms-win-core-synch-l1-1-0.dll
-				${KITSPATH}/api-ms-win-core-synch-l1-2-0.dll
-				${KITSPATH}/api-ms-win-core-timezone-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-conio-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-convert-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-environment-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-filesystem-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-heap-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-locale-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-math-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-process-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-runtime-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-stdio-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-string-l1-1-0.dll
-				${KITSPATH}/api-ms-win-crt-time-l1-1-0.dll
-				${KITSPATH}/ucrtbase.dll
-				${MSVC14_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC140.CRT/vcruntime140.dll
-			DESTINATION "."
-		)
-		if(WITH_OPENMP)
-			install(
-				FILES ${MSVC14_REDIST_DIR}/${_WIN_PLATFORM}/Microsoft.VC140.OpenMP/vcomp140.dll
-				DESTINATION "."
-			)
-		endif()
-	endif()
 endif()

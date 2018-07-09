@@ -121,7 +121,9 @@ protected:
 
 class OSLCompiler {
 public:
-	OSLCompiler(void *manager, void *shadingsys, ImageManager *image_manager, Film *film);
+	OSLCompiler(void *manager, void *shadingsys,
+	            ImageManager *image_manager,
+	            LightManager *light_manager);
 	void compile(Scene *scene, OSLGlobals *og, Shader *shader);
 
 	void add(ShaderNode *node, const char *name, bool isfilepath = false);
@@ -141,11 +143,13 @@ public:
 	void parameter_array(const char *name, const float f[], int arraylen);
 	void parameter_color_array(const char *name, const array<float3>& f);
 
+	void parameter_attribute(const char *name, ustring s);
+
 	ShaderType output_type() { return current_type; }
 
 	bool background;
 	ImageManager *image_manager;
-	Film *film;
+	LightManager *light_manager;
 
 private:
 #ifdef WITH_OSL
@@ -168,4 +172,3 @@ private:
 CCL_NAMESPACE_END
 
 #endif /* __OSL_H__  */
-

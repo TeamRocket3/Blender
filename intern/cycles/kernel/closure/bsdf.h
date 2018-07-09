@@ -29,24 +29,58 @@
 #include "kernel/closure/bsdf_hair.h"
 #include "kernel/closure/bsdf_principled_diffuse.h"
 #include "kernel/closure/bsdf_principled_sheen.h"
-#ifdef __SUBSURFACE__
-#  include "kernel/closure/bssrdf.h"
-#endif
-#ifdef __VOLUME__
-#  include "kernel/closure/volume.h"
-#endif
+#include "kernel/closure/bssrdf.h"
+#include "kernel/closure/volume.h"
 
 CCL_NAMESPACE_BEGIN
 
-ccl_device_forceinline int bsdf_sample(KernelGlobals *kg,
-                                       ShaderData *sd,
-                                       const ShaderClosure *sc,
-                                       float randu,
-                                       float randv,
-                                       float3 *eval,
-                                       float3 *omega_in,
-                                       differential3 *domega_in,
-                                       float *pdf)
+/* Returns the square of the roughness of the closure if it has roughness,
+ * 0 for singular closures and 1 otherwise. */
+ccl_device_inline float bsdf_get_specular_roughness_squared(const ShaderClosure *sc)
+{
+	if(CLOSURE_IS_BSDF_SINGULAR(sc->type)) {
+		return 0.0f;
+	}
+
+	if(CLOSURE_IS_BSDF_MICROFACET(sc->type)) {
+		MicrofacetBsdf *bsdf = (MicrofacetBsdf*)sc;
+		return bsdf->alpha_x*bsdf->alpha_y;
+	}
+
+	return 1.0f;
+}
+
+ccl_device_inline float bsdf_get_roughness_squared(const ShaderClosure *sc)
+{
+	/* This version includes diffuse, mainly for baking Principled BSDF
+	 * where specular and metallic zero otherwise does not bake the
+	 * specified roughness parameter. */
+	if(sc->type == CLOSURE_BSDF_OREN_NAYAR_ID) {
+		OrenNayarBsdf *bsdf = (OrenNayarBsdf*)sc;
+		return sqr(sqr(bsdf->roughness));
+	}
+
+	if(sc->type == CLOSURE_BSDF_PRINCIPLED_DIFFUSE_ID) {
+		PrincipledDiffuseBsdf *bsdf = (PrincipledDiffuseBsdf*)sc;
+		return sqr(sqr(bsdf->roughness));
+	}
+
+	if(CLOSURE_IS_BSDF_DIFFUSE(sc->type)) {
+		return 0.0f;
+	}
+
+	return bsdf_get_specular_roughness_squared(sc);
+}
+
+ccl_device_inline int bsdf_sample(KernelGlobals *kg,
+                                  ShaderData *sd,
+                                  const ShaderClosure *sc,
+                                  float randu,
+                                  float randv,
+                                  float3 *eval,
+                                  float3 *omega_in,
+                                  differential3 *domega_in,
+                                  float *pdf)
 {
 	int label;
 
@@ -159,13 +193,24 @@ ccl_device_forceinline int bsdf_sample(KernelGlobals *kg,
 			break;
 	}
 
+	/* Test if BSDF sample should be treated as transparent for background. */
+	if(label & LABEL_TRANSMIT) {
+		float threshold_squared = kernel_data.background.transparent_roughness_squared_threshold;
+
+		if(threshold_squared >= 0.0f) {
+			if(bsdf_get_specular_roughness_squared(sc) <= threshold_squared) {
+				label |= LABEL_TRANSMIT_TRANSPARENT;
+			}
+		}
+	}
+
 	return label;
 }
 
 #ifndef __KERNEL_CUDA__
 ccl_device
 #else
-ccl_device_forceinline
+ccl_device_inline
 #endif
 float3 bsdf_eval(KernelGlobals *kg,
                  ShaderData *sd,
@@ -440,23 +485,4 @@ ccl_device bool bsdf_merge(ShaderClosure *a, ShaderClosure *b)
 #endif
 }
 
-/* Classifies a closure as diffuse-like or specular-like.
- * This is needed for the denoising feature pass generation,
- * which are written on the first bounce where more than 25%
- * of the sampling weight belongs to diffuse-line closures. */
-ccl_device_inline bool bsdf_is_specular_like(ShaderClosure *sc)
-{
-	if(CLOSURE_IS_BSDF_TRANSPARENT(sc->type)) {
-		return true;
-	}
-
-	if(CLOSURE_IS_BSDF_MICROFACET(sc->type)) {
-		MicrofacetBsdf *bsdf = (MicrofacetBsdf*) sc;
-		return (bsdf->alpha_x*bsdf->alpha_y <= 0.075f*0.075f);
-	}
-
-	return false;
-}
-
 CCL_NAMESPACE_END
-

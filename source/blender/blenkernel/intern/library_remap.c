@@ -194,9 +194,11 @@ static int foreach_libblock_remap_callback(void *user_data, ID *id_self, ID **id
 			id->tag |= LIB_TAG_DOIT;
 		}
 
-		/* Special hack in case it's Object->data and we are in edit mode (skipped_direct too). */
+		/* Special hack in case it's Object->data and we are in edit mode, and new_id is not NULL
+		 * (otherwise, we follow common NEVER_NULL flags).
+		 * (skipped_indirect too). */
 		if ((is_never_null && skip_never_null) ||
-		    (is_obj_editmode && (((Object *)id)->data == *id_p)) ||
+		    (is_obj_editmode && (((Object *)id)->data == *id_p) && new_id != NULL) ||
 		    (skip_indirect && is_indirect))
 		{
 			if (is_indirect) {
@@ -333,12 +335,12 @@ static void libblock_remap_data_postprocess_object_update(Main *bmain, Object *o
 		 *     - unlinked old_ob (i.e. new_ob is NULL), in which case scenes' bases have been removed already.
 		 *     - remapped old_ob by new_ob, in which case scenes' bases are still valid as is.
 		 * So in any case, no need to update them here. */
-		if (BKE_group_object_find(NULL, old_ob) == NULL) {
+		if (BKE_group_object_find(bmain, NULL, old_ob) == NULL) {
 			old_ob->flag &= ~OB_FROMGROUP;
 		}
 		if (new_ob == NULL) {  /* We need to remove NULL-ified groupobjects... */
 			for (Group *group = bmain->group.first; group; group = group->id.next) {
-				BKE_group_object_unlink(group, NULL, NULL, NULL);
+				BKE_group_object_unlink(bmain, group, NULL, NULL, NULL);
 			}
 		}
 		else {
@@ -354,7 +356,7 @@ static void libblock_remap_data_postprocess_object_update(Main *bmain, Object *o
 	}
 }
 
-static void libblock_remap_data_postprocess_group_scene_unlink(Main *UNUSED(bmain), Scene *sce, ID *old_id)
+static void libblock_remap_data_postprocess_group_scene_unlink(Main *bmain, Scene *sce, ID *old_id)
 {
 	/* Note that here we assume no object has no base (i.e. all objects are assumed instanced
 	 * in one scene...). */
@@ -363,11 +365,11 @@ static void libblock_remap_data_postprocess_group_scene_unlink(Main *UNUSED(bmai
 			Object *ob = base->object;
 
 			if (ob->flag & OB_FROMGROUP) {
-				Group *grp = BKE_group_object_find(NULL, ob);
+				Group *grp = BKE_group_object_find(bmain, NULL, ob);
 
 				/* Unlinked group (old_id) is still in bmain... */
 				if (grp && (&grp->id == old_id || grp->id.us == 0)) {
-					grp = BKE_group_object_find(grp, ob);
+					grp = BKE_group_object_find(bmain, grp, ob);
 				}
 				if (!grp) {
 					ob->flag &= ~OB_FROMGROUP;
@@ -380,7 +382,7 @@ static void libblock_remap_data_postprocess_group_scene_unlink(Main *UNUSED(bmai
 	}
 }
 
-static void libblock_remap_data_postprocess_obdata_relink(Main *UNUSED(bmain), Object *ob, ID *new_id)
+static void libblock_remap_data_postprocess_obdata_relink(Main *bmain, Object *ob, ID *new_id)
 {
 	if (ob->data == new_id) {
 		switch (GS(new_id->name)) {
@@ -394,7 +396,7 @@ static void libblock_remap_data_postprocess_obdata_relink(Main *UNUSED(bmain), O
 				break;
 		}
 		test_object_modifiers(ob);
-		test_object_materials(ob, new_id);
+		test_object_materials(bmain, ob, new_id);
 	}
 }
 
@@ -732,7 +734,7 @@ static int id_relink_to_newid_looper(void *UNUSED(user_data), ID *UNUSED(self_id
  */
 void BKE_libblock_relink_to_newid(ID *id)
 {
-	if (ID_IS_LINKED_DATABLOCK(id))
+	if (ID_IS_LINKED(id))
 		return;
 
 	BKE_library_foreach_ID_link(NULL, id, id_relink_to_newid_looper, NULL, 0);
@@ -959,7 +961,12 @@ void BKE_libblock_free_ex(Main *bmain, void *idv, const bool do_id_user, const b
 	DAG_id_type_tag(bmain, type);
 
 #ifdef WITH_PYTHON
+#ifdef WITH_PYTHON_SAFETY
 	BPY_id_release(id);
+#endif
+	if (id->py_instance) {
+		BPY_DECREF_RNA_INVALIDATE(id->py_instance);
+	}
 #endif
 
 	if (do_id_user) {
@@ -997,7 +1004,7 @@ void BKE_libblock_free(Main *bmain, void *idv)
 void BKE_libblock_free_us(Main *bmain, void *idv)      /* test users */
 {
 	ID *id = idv;
-	
+
 	id_us_min(id);
 
 	/* XXX This is a temp (2.77) hack so that we keep same behavior as in 2.76 regarding groups when deleting an object.
@@ -1013,7 +1020,7 @@ void BKE_libblock_free_us(Main *bmain, void *idv)      /* test users */
 
 	if (id->us == 0) {
 		BKE_libblock_unlink(bmain, id, false, false);
-		
+
 		BKE_libblock_free(bmain, id);
 	}
 }

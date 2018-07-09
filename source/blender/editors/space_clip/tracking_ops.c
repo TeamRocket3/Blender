@@ -226,7 +226,6 @@ static int delete_track_exec(bContext *C, wmOperator *UNUSED(op))
 	MovieClip *clip = ED_space_clip_get_clip(sc);
 	MovieTracking *tracking = &clip->tracking;
 	bool changed = false;
-
 	/* Delete selected plane tracks. */
 	ListBase *plane_tracks_base = BKE_tracking_get_active_plane_tracks(tracking);
 	for (MovieTrackingPlaneTrack *plane_track = plane_tracks_base->first,
@@ -235,14 +234,11 @@ static int delete_track_exec(bContext *C, wmOperator *UNUSED(op))
 	     plane_track = next_plane_track)
 	{
 		next_plane_track = plane_track->next;
-
 		if (PLANE_TRACK_VIEW_SELECTED(plane_track)) {
-			BKE_tracking_plane_track_free(plane_track);
-			BLI_freelinkN(plane_tracks_base, plane_track);
+			clip_delete_plane_track(C, clip, plane_track);
 			changed = true;
 		}
 	}
-
 	/* Remove selected point tracks (they'll also be removed from planes which
 	 * uses them).
 	 */
@@ -257,14 +253,11 @@ static int delete_track_exec(bContext *C, wmOperator *UNUSED(op))
 			changed = true;
 		}
 	}
-
 	/* Nothing selected now, unlock view so it can be scrolled nice again. */
 	sc->flag &= ~SC_LOCK_SELECTION;
-
 	if (changed) {
 		WM_event_add_notifier(C, NC_MOVIECLIP | NA_EDITED, clip);
 	}
-
 	return OPERATOR_FINISHED;
 }
 
@@ -1865,6 +1858,10 @@ static bool is_track_clean(MovieTrackingTrack *track, int frames, int del)
 		}
 	}
 
+	if (del && count == 0) {
+		ok = 0;
+	}
+
 	if (del) {
 		MEM_freeN(track->markers);
 
@@ -2109,7 +2106,7 @@ void CLIP_OT_copy_tracks(wmOperatorType *ot)
 
 /********************* paste tracks from clipboard operator ********************/
 
-static int paste_tracks_poll(bContext *C)
+static bool paste_tracks_poll(bContext *C)
 {
 	if (ED_space_clip_tracking_poll(C)) {
 		return BKE_tracking_clipboard_has_tracks();

@@ -142,7 +142,7 @@ bool BlenderSync::sync_recalc()
 			if(b_ob->is_updated_data() || b_ob->data().is_updated())
 				light_map.set_recalc(*b_ob);
 		}
-		
+
 		if(b_ob->is_updated_data()) {
 			BL::Object::particle_systems_iterator b_psys;
 			for(b_ob->particle_systems.begin(b_psys); b_psys != b_ob->particle_systems.end(); ++b_psys)
@@ -222,9 +222,7 @@ void BlenderSync::sync_data(BL::RenderSettings& b_render,
 
 void BlenderSync::sync_integrator()
 {
-#ifdef __CAMERA_MOTION__
 	BL::RenderSettings r = b_scene.render();
-#endif
 	PointerRNA cscene = RNA_pointer_get(&b_scene.ptr, "cycles");
 
 	experimental = (get_enum(cscene, "feature_set") != 0);
@@ -269,7 +267,6 @@ void BlenderSync::sync_integrator()
 
 	integrator->sample_clamp_direct = get_float(cscene, "sample_clamp_direct");
 	integrator->sample_clamp_indirect = get_float(cscene, "sample_clamp_indirect");
-#ifdef __CAMERA_MOTION__
 	if(!preview) {
 		if(integrator->motion_blur != r.use_motion_blur()) {
 			scene->object_manager->tag_update(scene);
@@ -278,7 +275,6 @@ void BlenderSync::sync_integrator()
 
 		integrator->motion_blur = r.use_motion_blur();
 	}
-#endif
 
 	integrator->method = (Integrator::Method)get_enum(cscene,
 	                                                  "progressive",
@@ -305,7 +301,7 @@ void BlenderSync::sync_integrator()
 		integrator->mesh_light_samples = mesh_light_samples * mesh_light_samples;
 		integrator->subsurface_samples = subsurface_samples * subsurface_samples;
 		integrator->volume_samples = volume_samples * volume_samples;
-	} 
+	}
 	else {
 		integrator->diffuse_samples = diffuse_samples;
 		integrator->glossy_samples = glossy_samples;
@@ -340,7 +336,7 @@ void BlenderSync::sync_film()
 
 	Film *film = scene->film;
 	Film prevfilm = *film;
-	
+
 	film->exposure = get_float(cscene, "film_exposure");
 	film->filter_type = (FilterType)get_enum(cscene,
 	                                         "pixel_filter_type",
@@ -496,11 +492,13 @@ PassType BlenderSync::get_pass_type(BL::RenderPass& b_pass)
 	MAP_PASS("GlossDir", PASS_GLOSSY_DIRECT);
 	MAP_PASS("TransDir", PASS_TRANSMISSION_DIRECT);
 	MAP_PASS("SubsurfaceDir", PASS_SUBSURFACE_DIRECT);
+	MAP_PASS("VolumeDir", PASS_VOLUME_DIRECT);
 
 	MAP_PASS("DiffInd", PASS_DIFFUSE_INDIRECT);
 	MAP_PASS("GlossInd", PASS_GLOSSY_INDIRECT);
 	MAP_PASS("TransInd", PASS_TRANSMISSION_INDIRECT);
 	MAP_PASS("SubsurfaceInd", PASS_SUBSURFACE_INDIRECT);
+	MAP_PASS("VolumeInd", PASS_VOLUME_INDIRECT);
 
 	MAP_PASS("DiffCol", PASS_DIFFUSE_COLOR);
 	MAP_PASS("GlossCol", PASS_GLOSSY_COLOR);
@@ -518,6 +516,7 @@ PassType BlenderSync::get_pass_type(BL::RenderPass& b_pass)
 	MAP_PASS("Debug BVH Intersections", PASS_BVH_INTERSECTIONS);
 	MAP_PASS("Debug Ray Bounces", PASS_RAY_BOUNCES);
 #endif
+	MAP_PASS("Debug Render Time", PASS_RENDER_TIME);
 #undef MAP_PASS
 
 	return PASS_NONE;
@@ -567,25 +566,25 @@ void BlenderSync::sync_film(BL::RenderLayer& b_rlay,
 			if(pass_type != PASS_NONE)
 				passes.add(pass_type);
 		}
-		
+
 		int crypto_depth = std::min(16, get_int(crp, "pass_crypto_depth")) / 2;
 		scene->film->use_cryptomatte = crypto_depth;
 
 		if(get_boolean(crp, "use_pass_crypto_object")) {
 			for(int i = 0; i < crypto_depth; ++i) {
 				string passname = string_printf("uCryptoObject%02d", i);
-				AOV aov = {ustring(passname), 9999, AOV_CRYPTOMATTE};
+				AOV aov = { ustring(passname), 9999, AOV_CRYPTOMATTE };
 				passes.add(aov);
 				passname = "AOV " + passname;
 				b_engine.add_pass(passname.c_str(), 4, "RGBA", b_srlay.name().c_str(), 2);
 			}
 			scene->film->use_cryptomatte |= CRYPT_OBJECT;
 		}
-		
+
 		if(get_boolean(crp, "use_pass_crypto_material")) {
 			for(int i = 0; i < crypto_depth; ++i) {
 				string passname = string_printf("uCryptoMaterial%02d", i);
-				AOV aov = {ustring(passname), 9999, AOV_CRYPTOMATTE};
+				AOV aov = { ustring(passname), 9999, AOV_CRYPTOMATTE };
 				passes.add(aov);
 				passname = "AOV " + passname;
 				b_engine.add_pass(passname.c_str(), 4, "RGBA", b_srlay.name().c_str(), 2);
@@ -596,7 +595,7 @@ void BlenderSync::sync_film(BL::RenderLayer& b_rlay,
 		if(get_boolean(crp, "use_pass_crypto_asset")) {
 			for(int i = 0; i < crypto_depth; ++i) {
 				string passname = string_printf("uCryptoAsset%02d", i);
-				AOV aov = {ustring(passname), 9999, AOV_CRYPTOMATTE};
+				AOV aov = { ustring(passname), 9999, AOV_CRYPTOMATTE };
 				passes.add(aov);
 				passname = "AOV " + passname;
 				b_engine.add_pass(passname.c_str(), 4, "RGBA", b_srlay.name().c_str(), 2);
@@ -609,17 +608,17 @@ void BlenderSync::sync_film(BL::RenderLayer& b_rlay,
 
 		PointerRNA crp = RNA_pointer_get(&b_srlay.ptr, "cycles");
 		if(get_boolean(crp, "denoising_store_passes") &&
-		   get_boolean(crp, "use_denoising")) {
-			b_engine.add_pass("Denoising Normal",          3, "XYZ", b_srlay.name().c_str(), 0);
+			get_boolean(crp, "use_denoising")) {
+			b_engine.add_pass("Denoising Normal", 3, "XYZ", b_srlay.name().c_str(), 0);
 			b_engine.add_pass("Denoising Normal Variance", 3, "XYZ", b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Albedo",          3, "RGB", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Albedo", 3, "RGB", b_srlay.name().c_str(), 0);
 			b_engine.add_pass("Denoising Albedo Variance", 3, "RGB", b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Depth",           1, "Z",   b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Depth Variance",  1, "Z",   b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Shadow A",        3, "XYV", b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Shadow B",        3, "XYV", b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Image",           3, "RGB", b_srlay.name().c_str(), 0);
-			b_engine.add_pass("Denoising Image Variance",  3, "RGB", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Depth", 1, "Z", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Depth Variance", 1, "Z", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Shadow A", 3, "XYV", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Shadow B", 3, "XYV", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Image", 3, "RGB", b_srlay.name().c_str(), 0);
+			b_engine.add_pass("Denoising Image Variance", 3, "RGB", b_srlay.name().c_str(), 0);
 		}
 #ifdef __KERNEL_DEBUG__
 		if(get_boolean(crp, "pass_debug_bvh_traversed_nodes")) {
@@ -639,6 +638,18 @@ void BlenderSync::sync_film(BL::RenderLayer& b_rlay,
 			passes.add(PASS_RAY_BOUNCES);
 		}
 #endif
+	}
+	if(get_boolean(crp, "pass_debug_render_time")) {
+		b_engine.add_pass("Debug Render Time", 1, "X", b_srlay.name().c_str(), 0);
+		passes.add(PASS_RENDER_TIME);
+	}
+	if(get_boolean(crp, "use_pass_volume_direct")) {
+		b_engine.add_pass("VolumeDir", 3, "RGB", b_srlay.name().c_str(), 0);
+		passes.add(PASS_VOLUME_DIRECT);
+	}
+	if(get_boolean(crp, "use_pass_volume_indirect")) {
+		b_engine.add_pass("VolumeInd", 3, "RGB", b_srlay.name().c_str(), 0);
+		passes.add(PASS_VOLUME_INDIRECT);
 	}
 
 	scene->film->denoising_flags = 0;
@@ -675,7 +686,7 @@ SceneParams BlenderSync::get_scene_params(BL::Scene& b_scene,
 		params.shadingsystem = SHADINGSYSTEM_SVM;
 	else if(shadingsystem == 1)
 		params.shadingsystem = SHADINGSYSTEM_OSL;
-	
+
 	if(background || DebugFlags().viewport_static_bvh)
 		params.bvh_type = SceneParams::BVH_STATIC;
 	else
@@ -704,7 +715,7 @@ SceneParams BlenderSync::get_scene_params(BL::Scene& b_scene,
 		params.texture_limit = 0;
 	}
 
-	params.use_qbvh = DebugFlags().cpu.qbvh;
+	params.bvh_layout = DebugFlags().cpu.bvh_layout;
 
 	return params;
 }
@@ -740,7 +751,7 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine& b_engine,
 
 	/* device type */
 	vector<DeviceInfo>& devices = Device::available_devices();
-	
+
 	/* device default CPU */
 	foreach(DeviceInfo& device, devices) {
 		if(device.type == DEVICE_CPU) {
@@ -815,7 +826,7 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine& b_engine,
 	int aa_samples = get_int(cscene, "aa_samples");
 	int preview_samples = get_int(cscene, "preview_samples");
 	int preview_aa_samples = get_int(cscene, "preview_aa_samples");
-	
+
 	if(get_boolean(cscene, "use_square_samples")) {
 		aa_samples = aa_samples * aa_samples;
 		preview_aa_samples = preview_aa_samples * preview_aa_samples;
@@ -911,7 +922,7 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine& b_engine,
 		params.shadingsystem = SHADINGSYSTEM_SVM;
 	else if(shadingsystem == 1)
 		params.shadingsystem = SHADINGSYSTEM_OSL;
-	
+
 	/* color managagement */
 #ifdef GLEW_MX
 	/* When using GLEW MX we need to check whether we've got an OpenGL
@@ -936,4 +947,3 @@ SessionParams BlenderSync::get_session_params(BL::RenderEngine& b_engine,
 }
 
 CCL_NAMESPACE_END
-

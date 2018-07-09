@@ -34,6 +34,7 @@
 #include "util/util_md5.h"
 #include "util/util_path.h"
 #include "util/util_progress.h"
+#include "util/util_projection.h"
 
 #endif
 
@@ -97,8 +98,9 @@ void OSLShaderManager::device_update(Device *device, DeviceScene *dscene, Scene 
 		 * has a single state, but we put the lock here so different renders can
 		 * compile shaders alternating */
 		thread_scoped_lock lock(ss_mutex);
-
-		OSLCompiler compiler((void*)this, (void*)ss, scene->image_manager, scene->film);
+		OSLCompiler compiler((void*)this, (void*)ss,
+		                     scene->image_manager,
+		                     scene->light_manager);
 		compiler.background = (shader == scene->default_background);
 		compiler.compile(scene, og, shader);
 
@@ -119,7 +121,7 @@ void OSLShaderManager::device_update(Device *device, DeviceScene *dscene, Scene 
 		shader->need_update = false;
 
 	need_update = false;
-	
+
 	/* set texture system */
 	scene->image_manager->set_osl_texture_system((void*)ts);
 
@@ -233,18 +235,25 @@ void OSLShaderManager::shading_system_init()
 			"glossy",			/* PATH_RAY_GLOSSY */
 			"singular",			/* PATH_RAY_SINGULAR */
 			"transparent",		/* PATH_RAY_TRANSPARENT */
+
 			"shadow",			/* PATH_RAY_SHADOW_OPAQUE_NON_CATCHER */
 			"shadow",			/* PATH_RAY_SHADOW_OPAQUE_CATCHER */
 			"shadow",			/* PATH_RAY_SHADOW_TRANSPARENT_NON_CATCHER */
 			"shadow",			/* PATH_RAY_SHADOW_TRANSPARENT_CATCHER */
 
 			"__unused__",
+			"volume_scatter",	/* PATH_RAY_VOLUME_SCATTER */
+			"__unused__",
+
 			"__unused__",
 			"diffuse_ancestor",	/* PATH_RAY_DIFFUSE_ANCESTOR */
 			"__unused__",
 			"__unused__",
-			"__unused__",		/* PATH_RAY_SINGLE_PASS_DONE */
-			"volume_scatter",	/* PATH_RAY_VOLUME_SCATTER */
+			"__unused__",
+			"__unused__",
+			"__unused__",
+			"__unused__",
+			"__unused__",
 		};
 
 		const int nraytypes = sizeof(raytypes)/sizeof(raytypes[0]);
@@ -538,12 +547,14 @@ OSLNode *OSLShaderManager::osl_node(const std::string& filepath,
 
 /* Graph Compiler */
 
-OSLCompiler::OSLCompiler(void *manager_, void *shadingsys_, ImageManager *image_manager_, Film *film_)
+OSLCompiler::OSLCompiler(void *manager_, void *shadingsys_,
+                         ImageManager *image_manager_,
+                         LightManager *light_manager_)
 {
 	manager = manager_;
 	shadingsys = shadingsys_;
 	image_manager = image_manager_;
-	film = film_;
+	light_manager = light_manager_;
 	current_type = SHADER_TYPE_SURFACE;
 	current_shader = NULL;
 	background = false;
@@ -566,7 +577,7 @@ string OSLCompiler::compatible_name(ShaderNode *node, ShaderInput *input)
 	/* strip whitespace */
 	while((i = sname.find(" ")) != string::npos)
 		sname.replace(i, 1, "");
-	
+
 	/* if output exists with the same name, add "In" suffix */
 	foreach(ShaderOutput *output, node->outputs) {
 		if(input->name() == output->name()) {
@@ -574,7 +585,7 @@ string OSLCompiler::compatible_name(ShaderNode *node, ShaderInput *input)
 			break;
 		}
 	}
-	
+
 	return sname;
 }
 
@@ -586,7 +597,7 @@ string OSLCompiler::compatible_name(ShaderNode *node, ShaderOutput *output)
 	/* strip whitespace */
 	while((i = sname.find(" ")) != string::npos)
 		sname.replace(i, 1, "");
-	
+
 	/* if input exists with the same name, add "Out" suffix */
 	foreach(ShaderInput *input, node->inputs) {
 		if(input->name() == output->name()) {
@@ -594,7 +605,7 @@ string OSLCompiler::compatible_name(ShaderNode *node, ShaderOutput *output)
 			break;
 		}
 	}
-	
+
 	return sname;
 }
 
@@ -602,7 +613,7 @@ bool OSLCompiler::node_skip_input(ShaderNode *node, ShaderInput *input)
 {
 	/* exception for output node, only one input is actually used
 	 * depending on the current shader type */
-	
+
 	if(input->flags() & SocketType::SVM_INTERNAL)
 		return true;
 
@@ -692,7 +703,7 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
 		ss->Shader("displacement", name, id(node).c_str());
 	else
 		assert(0);
-	
+
 	/* link inputs to other nodes */
 	foreach(ShaderInput *input, node->inputs) {
 		if(input->link) {
@@ -736,6 +747,10 @@ void OSLCompiler::add(ShaderNode *node, const char *name, bool isfilepath)
 
 	if(node->has_object_dependency()) {
 		current_shader->has_object_dependency = true;
+	}
+
+	if(node->has_attribute_dependency()) {
+		current_shader->has_attribute_dependency = true;
 	}
 
 	if(node->has_integrator_dependency()) {
@@ -822,7 +837,9 @@ void OSLCompiler::parameter(ShaderNode* node, const char *name)
 		case SocketType::TRANSFORM:
 		{
 			Transform value = node->get_transform(socket);
-			ss->Parameter(uname, TypeDesc::TypeMatrix, &value);
+			ProjectionTransform projection(value);
+			projection = projection_transpose(projection);
+			ss->Parameter(uname, TypeDesc::TypeMatrix, &projection);
 			break;
 		}
 		case SocketType::BOOLEAN_ARRAY:
@@ -890,7 +907,11 @@ void OSLCompiler::parameter(ShaderNode* node, const char *name)
 		case SocketType::TRANSFORM_ARRAY:
 		{
 			const array<Transform>& value = node->get_transform_array(socket);
-			ss->Parameter(uname, array_typedesc(TypeDesc::TypeMatrix, value.size()), value.data());
+			array<ProjectionTransform> fvalue(value.size());
+			for(size_t i = 0; i < value.size(); i++) {
+				fvalue[i] = projection_transpose(ProjectionTransform(value[i]));
+			}
+			ss->Parameter(uname, array_typedesc(TypeDesc::TypeMatrix, fvalue.size()), fvalue.data());
 			break;
 		}
 		case SocketType::CLOSURE:
@@ -957,7 +978,9 @@ void OSLCompiler::parameter(const char *name, ustring s)
 void OSLCompiler::parameter(const char *name, const Transform& tfm)
 {
 	OSL::ShadingSystem *ss = (OSL::ShadingSystem*)shadingsys;
-	ss->Parameter(name, TypeDesc::TypeMatrix, (float*)&tfm);
+	ProjectionTransform projection(tfm);
+	projection = projection_transpose(projection);
+	ss->Parameter(name, TypeDesc::TypeMatrix, (float*)&projection);
 }
 
 void OSLCompiler::parameter_array(const char *name, const float f[], int arraylen)
@@ -983,6 +1006,14 @@ void OSLCompiler::parameter_color_array(const char *name, const array<float3>& f
 	TypeDesc type = TypeDesc::TypeColor;
 	type.arraylen = table.size();
 	ss->Parameter(name, type, table.data());
+}
+
+void OSLCompiler::parameter_attribute(const char *name, ustring s)
+{
+	if(Attribute::name_standard(s.c_str()))
+		parameter(name, (string("geom:") + s.c_str()).c_str());
+	else
+		parameter(name, s.c_str());
 }
 
 void OSLCompiler::find_dependencies(ShaderNodeSet& dependencies, ShaderInput *input)
@@ -1118,6 +1149,7 @@ void OSLCompiler::compile(Scene *scene, OSLGlobals *og, Shader *shader)
 		shader->has_surface_spatial_varying = false;
 		shader->has_volume_spatial_varying = false;
 		shader->has_object_dependency = false;
+		shader->has_attribute_dependency = false;
 		shader->has_integrator_dependency = false;
 
 		/* generate surface shader */
@@ -1217,4 +1249,3 @@ void OSLCompiler::parameter_color_array(const char * /*name*/, const array<float
 #endif /* WITH_OSL */
 
 CCL_NAMESPACE_END
-

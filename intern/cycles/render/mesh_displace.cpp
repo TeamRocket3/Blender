@@ -89,7 +89,7 @@ bool MeshManager::displace(Device *device, DeviceScene *dscene, Scene *scene, Me
 			int object = object_index;
 			int prim = mesh->tri_offset + i;
 			float u, v;
-			
+
 			switch(j) {
 				case 0:
 					u = 1.0f;
@@ -113,7 +113,7 @@ bool MeshManager::displace(Device *device, DeviceScene *dscene, Scene *scene, Me
 
 	if(d_input_size == 0)
 		return false;
-	
+
 	/* run device task */
 	device_vector<float4> d_output(device, "displace_output", MEM_READ_WRITE);
 	d_output.alloc(d_input_size);
@@ -149,7 +149,7 @@ bool MeshManager::displace(Device *device, DeviceScene *dscene, Scene *scene, Me
 	done.resize(num_verts, false);
 	int k = 0;
 
-	float4 *offset = (float4*)d_output.data_pointer;
+	float4 *offset = d_output.data();
 
 	Attribute *attr_mP = mesh->attributes.find(ATTR_STD_MOTION_VERTEX_POSITION);
 	for(size_t i = 0; i < num_triangles; i++) {
@@ -319,4 +319,3 @@ bool MeshManager::displace(Device *device, DeviceScene *dscene, Scene *scene, Me
 }
 
 CCL_NAMESPACE_END
-

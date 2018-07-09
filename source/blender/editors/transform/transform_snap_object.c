@@ -59,6 +59,10 @@
 
 #include "transform.h"
 
+/* -------------------------------------------------------------------- */
+/** Internal Data Types
+ * \{ */
+
 enum eViewProj {
 	VIEW_PROJ_NONE = -1,
 	VIEW_PROJ_ORTHO = 0,
@@ -132,11 +136,9 @@ struct SnapObjectContext {
 
 /** \} */
 
-
 /* -------------------------------------------------------------------- */
-
-/** Common utilities
-* \{ */
+/** Common Utilities
+ * \{ */
 
 
 typedef void(*IterSnapObjsCallback)(SnapObjectContext *sctx, bool is_obedit, Object *ob, float obmat[4][4], void *data);
@@ -156,18 +158,9 @@ static void iter_snap_objects(
         void *data)
 {
 	Base *base_act = sctx->scene->basact;
-	/* Need an exception for particle edit because the base is flagged with BA_HAS_RECALC_DATA
-	 * which makes the loop skip it, even the derived mesh will never change
-	 *
-	 * To solve that problem, we do it first as an exception.
-	 * */
-	if (base_act && base_act->object && base_act->object->mode & OB_MODE_PARTICLE_EDIT) {
-		sob_callback(sctx, false, base_act->object, base_act->object->obmat, data);
-	}
-
 	for (Base *base = sctx->scene->base.first; base != NULL; base = base->next) {
 		if ((BASE_VISIBLE_BGMODE(sctx->v3d_data.v3d, sctx->scene, base)) &&
-		    (base->flag & (BA_HAS_RECALC_OB | BA_HAS_RECALC_DATA)) == 0 &&
+		    (base->flag & BA_SNAP_FIX_DEPS_FIASCO) == 0 &&
 		    !((snap_select == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL))) ||
 		      (snap_select == SNAP_NOT_ACTIVE && base == base_act)))
 		{
@@ -175,7 +168,7 @@ static void iter_snap_objects(
 			Object *obj = base->object;
 			if (obj->transflag & OB_DUPLI) {
 				DupliObject *dupli_ob;
-				ListBase *lb = object_duplilist(sctx->bmain->eval_ctx, sctx->scene, obj);
+				ListBase *lb = object_duplilist(sctx->bmain, sctx->bmain->eval_ctx, sctx->scene, obj);
 				for (dupli_ob = lb->first; dupli_ob; dupli_ob = dupli_ob->next) {
 					use_obedit = obedit && dupli_ob->ob->data == obedit->data;
 					sob_callback(sctx, use_obedit, use_obedit ? obedit : dupli_ob->ob, dupli_ob->mat, data);
@@ -265,11 +258,9 @@ static int dm_looptri_to_poly_index(DerivedMesh *dm, const MLoopTri *lt);
 
 /** \} */
 
-
 /* -------------------------------------------------------------------- */
-
 /** \name Ray Cast Funcs
-* \{ */
+ * \{ */
 
 /* Store all ray-hits
  * Support for storing all depths, not just the first (raycast 'all') */
@@ -453,7 +444,7 @@ static bool raycastDerivedMesh(
 		}
 
 		if (treedata->tree == NULL) {
-			bvhtree_from_mesh_looptri(treedata, dm, 0.0f, 4, 6);
+			bvhtree_from_mesh_get(treedata, dm, BVHTREE_FROM_LOOPTRI, 4);
 
 			if (treedata->tree == NULL) {
 				return retval;
@@ -794,7 +785,6 @@ static void raycast_obj_cb(SnapObjectContext *sctx, bool is_obedit, Object *ob, 
  * Walks through all objects in the scene to find the `hit` on object surface.
  *
  * \param sctx: Snap context to store data.
- * \param snapdata: struct generated in `set_snapdata`.
  * \param snap_select : from enum eSnapSelect.
  * \param use_object_edit_cage : Uses the coordinates of BMesh(if any) to do the snapping.
  * \param obj_list: List with objects to snap (created in `create_object_list`).
@@ -851,9 +841,7 @@ static bool raycastObjects(
 
 /** \} */
 
-
 /* -------------------------------------------------------------------- */
-
 /** Snap Nearest utilities
  * \{ */
 
@@ -1163,9 +1151,7 @@ static float dist_squared_to_projected_aabb_simple(
 
 /** \} */
 
-
 /* -------------------------------------------------------------------- */
-
 /** Walk DFS
  * \{ */
 
@@ -1261,7 +1247,6 @@ static bool cb_nearest_walk_order(const BVHTreeAxisRange *UNUSED(bounds), char a
 /** \} */
 
 /* -------------------------------------------------------------------- */
-
 /** \name Internal Object Snapping API
  * \{ */
 
@@ -1702,10 +1687,10 @@ static bool snapDerivedMesh(
 		if (treedata->tree == NULL) {
 			switch (snapdata->snap_to) {
 				case SCE_SNAP_MODE_EDGE:
-					bvhtree_from_mesh_edges(treedata, dm, 0.0f, 2, 6);
+					bvhtree_from_mesh_get(treedata, dm, BVHTREE_FROM_EDGES, 2);
 					break;
 				case SCE_SNAP_MODE_VERTEX:
-					bvhtree_from_mesh_verts(treedata, dm, 0.0f, 2, 6);
+					bvhtree_from_mesh_get(treedata, dm, BVHTREE_FROM_VERTS, 2);
 					break;
 			}
 		}
@@ -2085,9 +2070,7 @@ static bool snapObjectsRay(
 
 /** \} */
 
-
 /* -------------------------------------------------------------------- */
-
 /** \name Public Object Snapping API
  * \{ */
 
@@ -2364,7 +2347,8 @@ bool ED_transform_snap_object_project_view3d_ex(
         const struct SnapObjectParams *params,
         const float mval[2], float *dist_px,
         float *ray_depth,
-        float r_loc[3], float r_no[3], int *r_index)
+        float r_loc[3], float r_no[3], int *r_index,
+        Object **r_ob, float r_obmat[4][4])
 {
 	float ray_origin[3], ray_start[3], ray_normal[3], depth_range[2], ray_end[3];
 
@@ -2396,7 +2380,7 @@ bool ED_transform_snap_object_project_view3d_ex(
 		        sctx,
 		        ray_start, ray_normal,
 		        params->snap_select, params->use_object_edit_cage,
-		        ray_depth, r_loc, r_no, r_index, NULL, NULL, NULL);
+		        ray_depth, r_loc, r_no, r_index, r_ob, r_obmat, NULL);
 	}
 	else {
 		SnapData snapdata;
@@ -2407,7 +2391,7 @@ bool ED_transform_snap_object_project_view3d_ex(
 		return snapObjectsRay(
 		        sctx, &snapdata,
 		        params->snap_select, params->use_object_edit_cage,
-		        ray_depth, dist_px, r_loc, r_no, NULL, NULL);
+		        ray_depth, dist_px, r_loc, r_no, r_ob, r_obmat);
 	}
 }
 
@@ -2425,7 +2409,8 @@ bool ED_transform_snap_object_project_view3d(
 	        params,
 	        mval, dist_px,
 	        ray_depth,
-	        r_loc, r_no, NULL);
+	        r_loc, r_no, NULL,
+	        NULL, NULL);
 }
 
 /**

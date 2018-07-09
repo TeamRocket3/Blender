@@ -1937,16 +1937,17 @@ void MASK_OT_handle_type_set(wmOperatorType *ot)
 
 
 /* ********* clear/set restrict view *********/
-static int mask_hide_view_clear_exec(bContext *C, wmOperator *UNUSED(op))
+static int mask_hide_view_clear_exec(bContext *C, wmOperator *op)
 {
 	Mask *mask = CTX_data_edit_mask(C);
 	MaskLayer *masklay;
 	bool changed = false;
+	const bool select = RNA_boolean_get(op->ptr, "select");
 
 	for (masklay = mask->masklayers.first; masklay; masklay = masklay->next) {
 
 		if (masklay->restrictflag & OB_RESTRICT_VIEW) {
-			ED_mask_layer_select_set(masklay, true);
+			ED_mask_layer_select_set(masklay, select);
 			masklay->restrictflag &= ~OB_RESTRICT_VIEW;
 			changed = true;
 		}
@@ -1977,6 +1978,8 @@ void MASK_OT_hide_view_clear(wmOperatorType *ot)
 
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+
+	RNA_def_boolean(ot->srna, "select", true, "Select", "");
 }
 
 static int mask_hide_view_set_exec(bContext *C, wmOperator *op)
@@ -2102,7 +2105,7 @@ void MASK_OT_feather_weight_clear(wmOperatorType *ot)
 
 /******************** move mask layer operator *********************/
 
-static int mask_layer_move_poll(bContext *C)
+static bool mask_layer_move_poll(bContext *C)
 {
 	if (ED_maskedit_mask_poll(C)) {
 		Mask *mask = CTX_data_edit_mask(C);
@@ -2331,7 +2334,7 @@ void MASK_OT_copy_splines(wmOperatorType *ot)
 
 /********************** paste tracks from clipboard operator *********************/
 
-static int paste_splines_poll(bContext *C)
+static bool paste_splines_poll(bContext *C)
 {
 	if (ED_maskedit_mask_poll(C)) {
 		return BKE_mask_clipboard_is_empty() == false;

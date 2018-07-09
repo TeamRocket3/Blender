@@ -27,7 +27,7 @@ else()
 	set(SNDFILE_OPTIONS --enable-static --disable-shared )
 endif()
 
-if(APPLE)
+if(UNIX)
 	set(SNDFILE_PATCH_CMD ${PATCH_CMD} --verbose -p 0 -d ${BUILD_DIR}/sndfile/src/external_sndfile < ${PATCH_DIR}/sndfile.diff)
 else()
 	set(SNDFILE_PATCH_CMD)
@@ -49,7 +49,14 @@ if(MSVC)
 	set_target_properties(external_sndfile PROPERTIES FOLDER Mingw)
 endif()
 
-add_dependencies(external_sndfile external_ogg external_vorbis)
+add_dependencies(
+	external_sndfile
+	external_ogg
+	external_vorbis
+)
 if(UNIX)
-	add_dependencies(external_sndfile external_flac)
+	add_dependencies(
+		external_sndfile
+		external_flac
+	)
 endif()

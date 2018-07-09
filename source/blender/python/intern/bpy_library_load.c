@@ -48,7 +48,7 @@
 
 #include "DNA_space_types.h" /* FILE_LINK, FILE_RELPATH */
 
-#include "bpy_util.h"
+#include "bpy_capi_utils.h"
 #include "bpy_library.h"
 
 #include "../generic/py_capi_utils.h"
@@ -205,7 +205,7 @@ static PyObject *bpy_lib_load(PyObject *UNUSED(self), PyObject *args, PyObject *
 
 	BLI_strncpy(ret->relpath, filename, sizeof(ret->relpath));
 	BLI_strncpy(ret->abspath, filename, sizeof(ret->abspath));
-	BLI_path_abs(ret->abspath, bmain->name);
+	BLI_path_abs(ret->abspath, BKE_main_blendfile_path(bmain));
 
 	ret->blo_handle = NULL;
 	ret->flag = ((is_link ? FILE_LINK : 0) |

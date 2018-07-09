@@ -78,6 +78,10 @@ typedef struct {
 #include "mathutils_Euler.h"
 #include "mathutils_Color.h"
 
+/* avoid checking all types */
+#define BaseMathObject_CheckExact(v) \
+	(Py_TYPE(v)->tp_dealloc == (destructor)BaseMathObject_dealloc)
+
 PyObject *BaseMathObject_owner_get(BaseMathObject *self, void *);
 PyObject *BaseMathObject_is_wrapped_get(BaseMathObject *self, void *);
 PyObject *BaseMathObject_is_frozen_get(BaseMathObject *self, void *);
@@ -169,7 +173,5 @@ int column_vector_multiplication(float rvec[4], VectorObject *vec, MatrixObject 
 /* dynstr as python string utility funcions */
 PyObject *mathutils_dynstr_to_py(struct DynStr *ds);
 #endif
-
-int mathutils_deepcopy_args_check(PyObject *args);
 
 #endif /* __MATHUTILS_H__ */

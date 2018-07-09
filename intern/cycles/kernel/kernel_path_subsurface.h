@@ -47,10 +47,11 @@ bool kernel_path_subsurface_scatter(
 
 		uint lcg_state = lcg_state_init_addrspace(state, 0x68bc21eb);
 
-		SubsurfaceIntersection ss_isect;
+		LocalIntersection ss_isect;
 		int num_hits = subsurface_scatter_multi_intersect(kg,
 		                                                  &ss_isect,
 		                                                  sd,
+		                                                  state,
 		                                                  sc,
 		                                                  &lcg_state,
 		                                                  bssrdf_u, bssrdf_v,
@@ -71,9 +72,7 @@ bool kernel_path_subsurface_scatter(
 			                               hit,
 			                               sd,
 			                               state,
-			                               state->flag,
-			                               sc,
-			                               false);
+			                               sc);
 
 			kernel_path_surface_connect_light(kg, sd, emission_sd, *throughput, state, L);
 
@@ -153,4 +152,3 @@ ccl_device void kernel_path_subsurface_setup_indirect(
 #endif  /* __SUBSURFACE__ */
 
 CCL_NAMESPACE_END
-

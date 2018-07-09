@@ -19,6 +19,8 @@
 
 #include <stdlib.h>
 
+#include "bvh/bvh_params.h"
+
 #include "device/device_memory.h"
 #include "device/device_task.h"
 
@@ -52,13 +54,13 @@ public:
 	string description;
 	string id; /* used for user preferences, should stay fixed with changing hardware config */
 	int num;
-	bool display_device;
-	bool advanced_shading;
-	bool has_bindless_textures; /* flag for GPU and Multi device */
-	bool has_volume_decoupled;
-	bool has_qbvh;
-	bool has_osl;
-	bool use_split_kernel; /* Denotes if the device is going to run cycles using split-kernel */
+	bool display_device;            /* GPU is used as a display device. */
+	bool advanced_shading;          /* Supports full shading system. */
+	bool has_half_images;           /* Support half-float textures. */
+	bool has_volume_decoupled;      /* Decoupled volume shading. */
+	BVHLayoutMask bvh_layout_mask;  /* Bitmask of supported BVH layouts. */
+	bool has_osl;                   /* Support Open Shading Language. */
+	bool use_split_kernel;          /* Use split or mega kernel. */
 	int cpu_threads;
 	vector<DeviceInfo> multi_devices;
 
@@ -70,9 +72,9 @@ public:
 		cpu_threads = 0;
 		display_device = false;
 		advanced_shading = true;
-		has_bindless_textures = false;
+		has_half_images = false;
 		has_volume_decoupled = false;
-		has_qbvh = false;
+		bvh_layout_mask = BVH_LAYOUT_NONE;
 		has_osl = false;
 		use_split_kernel = false;
 	}
@@ -88,9 +90,6 @@ class DeviceRequestedFeatures {
 public:
 	/* Use experimental feature set. */
 	bool experimental;
-
-	/* Maximum number of closures in shader trees. */
-	int max_closure;
 
 	/* Selective nodes compilation. */
 
@@ -124,7 +123,7 @@ public:
 
 	/* Use OpenSubdiv patch evaluation */
 	bool use_patch_evaluation;
-	
+
 	/* Use Transparent shadows */
 	bool use_transparent;
 
@@ -137,11 +136,13 @@ public:
 	/* Denoising features. */
 	bool use_denoising;
 
+	/* Use raytracing in shaders. */
+	bool use_shader_raytrace;
+
 	DeviceRequestedFeatures()
 	{
 		/* TODO(sergey): Find more meaningful defaults. */
 		experimental = false;
-		max_closure = 0;
 		max_nodes_group = 0;
 		nodes_features = 0;
 		use_hair = false;
@@ -156,12 +157,12 @@ public:
 		use_shadow_tricks = false;
 		use_principled = false;
 		use_denoising = false;
+		use_shader_raytrace = false;
 	}
 
 	bool modified(const DeviceRequestedFeatures& requested_features)
 	{
 		return !(experimental == requested_features.experimental &&
-		         max_closure == requested_features.max_closure &&
 		         max_nodes_group == requested_features.max_nodes_group &&
 		         nodes_features == requested_features.nodes_features &&
 		         use_hair == requested_features.use_hair &&
@@ -175,7 +176,8 @@ public:
 		         use_transparent == requested_features.use_transparent &&
 		         use_shadow_tricks == requested_features.use_shadow_tricks &&
 		         use_principled == requested_features.use_principled &&
-		         use_denoising == requested_features.use_denoising);
+		         use_denoising == requested_features.use_denoising &&
+		         use_shader_raytrace == requested_features.use_shader_raytrace);
 	}
 
 	/* Convert the requested features structure to a build options,
@@ -191,7 +193,6 @@ public:
 			string_printf("%d", max_nodes_group);
 		build_options += " -D__NODES_FEATURES__=" +
 			string_printf("%d", nodes_features);
-		build_options += string_printf(" -D__MAX_CLOSURE__=%d", max_closure);
 		if(!use_hair) {
 			build_options += " -D__NO_HAIR__";
 		}
@@ -227,6 +228,9 @@ public:
 		}
 		if(!use_denoising) {
 			build_options += " -D__NO_DENOISING__";
+		}
+		if(!use_shader_raytrace) {
+			build_options += " -D__NO_SHADER_RAYTRACE__";
 		}
 		return build_options;
 	}
@@ -282,7 +286,7 @@ public:
 	Stats &stats;
 
 	/* memory alignment */
-	virtual int mem_address_alignment() { return 16; }
+	virtual int mem_sub_ptr_alignment() { return MIN_ALIGNMENT_CPU_DATA_TYPES; }
 
 	/* constant memory */
 	virtual void const_copy_to(const char *name, void *host, size_t size) = 0;
@@ -290,7 +294,7 @@ public:
 	/* open shading language, only for CPU device */
 	virtual void *osl_memory() { return NULL; }
 
-	/* load/compile kernels, must be called before adding tasks */ 
+	/* load/compile kernels, must be called before adding tasks */
 	virtual bool load_kernels(
 	        const DeviceRequestedFeatures& /*requested_features*/)
 	{ return true; }
@@ -300,7 +304,7 @@ public:
 	virtual void task_add(DeviceTask& task) = 0;
 	virtual void task_wait() = 0;
 	virtual void task_cancel() = 0;
-	
+
 	/* opengl drawing */
 	virtual void draw_pixels(device_memory& mem, int y, int w, int h,
 		int dx, int dy, int width, int height, bool transparent,
@@ -358,4 +362,3 @@ private:
 CCL_NAMESPACE_END
 
 #endif /* __DEVICE_H__ */
-

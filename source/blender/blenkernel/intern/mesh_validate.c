@@ -62,8 +62,8 @@ typedef union {
 } EdgeUUID;
 
 typedef struct SortFace {
-	EdgeUUID		es[4];
-	unsigned int	index;
+	EdgeUUID     es[4];
+	unsigned int index;
 } SortFace;
 
 /* Used to detect polys (faces) using exactly the same vertices. */
@@ -126,28 +126,28 @@ static int search_face_cmp(const void *v1, const void *v2)
 	if (sfa->es[0].edval > sfb->es[0].edval) {
 		return 1;
 	}
-	else if	(sfa->es[0].edval < sfb->es[0].edval) {
+	else if (sfa->es[0].edval < sfb->es[0].edval) {
 		return -1;
 	}
 
-	else if	(sfa->es[1].edval > sfb->es[1].edval) {
+	else if (sfa->es[1].edval > sfb->es[1].edval) {
 		return 1;
 	}
-	else if	(sfa->es[1].edval < sfb->es[1].edval) {
+	else if (sfa->es[1].edval < sfb->es[1].edval) {
 		return -1;
 	}
 
-	else if	(sfa->es[2].edval > sfb->es[2].edval) {
+	else if (sfa->es[2].edval > sfb->es[2].edval) {
 		return 1;
 	}
-	else if	(sfa->es[2].edval < sfb->es[2].edval) {
+	else if (sfa->es[2].edval < sfb->es[2].edval) {
 		return -1;
 	}
 
-	else if	(sfa->es[3].edval > sfb->es[3].edval) {
+	else if (sfa->es[3].edval > sfb->es[3].edval) {
 		return 1;
 	}
-	else if	(sfa->es[3].edval < sfb->es[3].edval) {
+	else if (sfa->es[3].edval < sfb->es[3].edval) {
 		return -1;
 	}
 
@@ -992,7 +992,7 @@ bool BKE_mesh_validate_all_customdata(CustomData *vdata, CustomData *edata,
  *
  * \returns true if a change is made.
  */
-int BKE_mesh_validate(Mesh *me, const int do_verbose, const int cddata_check_mask)
+bool BKE_mesh_validate(Mesh *me, const bool do_verbose, const bool cddata_check_mask)
 {
 	bool is_valid = true;
 	bool changed;
@@ -1089,7 +1089,7 @@ void BKE_mesh_cd_validate(Mesh *me)
  * Check all material indices of polygons are valid, invalid ones are set to 0.
  * \returns is_valid.
  */
-int BKE_mesh_validate_material_indices(Mesh *me)
+bool BKE_mesh_validate_material_indices(Mesh *me)
 {
 	MPoly *mp;
 	const int max_idx = max_ii(0, me->totcol - 1);
@@ -1486,7 +1486,7 @@ void BKE_mesh_calc_edges(Mesh *mesh, bool update, const bool select)
 		}
 	}
 
-	totedge = BLI_edgehash_size(eh);
+	totedge = BLI_edgehash_len(eh);
 
 	/* write new edges into a temporary CustomData */
 	CustomData_reset(&edata);

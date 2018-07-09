@@ -1550,18 +1550,21 @@ class VIEW3D_MT_object_specials(Menu):
             layout.operator_context = 'INVOKE_REGION_WIN'
 
             if scene.render.use_shading_nodes:
-                try:
-                    value = lamp.node_tree.nodes["Emission"].inputs["Strength"].default_value
-                except AttributeError:
-                    value = None
+                emission_node = None
+                if lamp.node_tree:
+                    for node in lamp.node_tree.nodes:
+                        if getattr(node, "type", None) == 'EMISSION':
+                            emission_node = node
+                            break
 
-                if value is not None:
+                if emission_node is not None:
                     props = layout.operator("wm.context_modal_mouse", text="Strength")
                     props.data_path_iter = "selected_editable_objects"
-                    props.data_path_item = "data.node_tree.nodes[\"Emission\"].inputs[\"Strength\"].default_value"
+                    props.data_path_item = "data.node_tree" \
+                                           ".nodes[\"" + emission_node.name + "\"]" \
+                                           ".inputs[\"Strength\"].default_value"
                     props.header_text = "Lamp Strength: %.3f"
                     props.input_scale = 0.1
-                del value
 
                 if lamp.type == 'AREA':
                     props = layout.operator("wm.context_modal_mouse", text="Size X")
@@ -2053,6 +2056,7 @@ class VIEW3D_MT_sculpt(Menu):
         layout.prop(sculpt, "show_brush")
         layout.prop(sculpt, "use_deform_only")
         layout.prop(sculpt, "show_diffuse_color")
+        layout.prop(sculpt, "show_mask")
 
 
 class VIEW3D_MT_hide_mask(Menu):
@@ -2626,8 +2630,10 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
 
         layout.operator("mesh.merge")
         layout.operator("mesh.remove_doubles")
-        layout.operator("mesh.rip_move")
-        layout.operator("mesh.rip_move_fill")
+        props = layout.operator("mesh.rip_move")
+        props.MESH_OT_rip.use_fill = False
+        props = layout.operator("mesh.rip_move", text="Rip Fill")
+        props.MESH_OT_rip.use_fill = True
         layout.operator("mesh.rip_edge_move")
         layout.operator("mesh.split")
         layout.operator_menu_enum("mesh.separate", "type")
@@ -2664,8 +2670,8 @@ class VIEW3D_MT_edit_mesh_vertices(Menu):
         layout.operator("object.vertex_parent_set")
 
 
-class VIEW3D_MT_edit_mesh_edges(Menu):
-    bl_label = "Edges"
+class VIEW3D_MT_edit_mesh_edges_data(Menu):
+    bl_label = "Edge Data"
 
     def draw(self, context):
         layout = self.layout
@@ -2673,13 +2679,6 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
         with_freestyle = bpy.app.build_options.freestyle
 
         layout.operator_context = 'INVOKE_REGION_WIN'
-
-        layout.operator("mesh.edge_face_add")
-        layout.operator("mesh.subdivide")
-        layout.operator("mesh.subdivide_edgering")
-        layout.operator("mesh.unsubdivide")
-
-        layout.separator()
 
         layout.operator("transform.edge_crease")
         layout.operator("transform.edge_bevelweight")
@@ -2700,6 +2699,26 @@ class VIEW3D_MT_edit_mesh_edges(Menu):
             layout.operator("mesh.mark_freestyle_edge").clear = False
             layout.operator("mesh.mark_freestyle_edge", text="Clear Freestyle Edge").clear = True
             layout.separator()
+
+
+class VIEW3D_MT_edit_mesh_edges(Menu):
+    bl_label = "Edges"
+
+    def draw(self, context):
+        layout = self.layout
+
+        layout.operator_context = 'INVOKE_REGION_WIN'
+
+        layout.operator("mesh.edge_face_add")
+        layout.operator("mesh.subdivide")
+        layout.operator("mesh.subdivide_edgering")
+        layout.operator("mesh.unsubdivide")
+
+        layout.separator()
+
+        layout.menu("VIEW3D_MT_edit_mesh_edges_data")
+
+        layout.separator()
 
         layout.operator("mesh.edge_rotate", text="Rotate Edge CW").use_ccw = False
         layout.operator("mesh.edge_rotate", text="Rotate Edge CCW").use_ccw = True
@@ -2946,6 +2965,7 @@ class VIEW3D_MT_edit_curve_segments(Menu):
 
         layout.operator("curve.subdivide")
         layout.operator("curve.switch_direction")
+
 
 class VIEW3D_MT_edit_curve_clean(Menu):
     bl_label = "Clean Up"
@@ -3375,11 +3395,6 @@ class VIEW3D_PT_view3d_properties(Panel):
     bl_region_type = 'UI'
     bl_label = "View"
 
-    @classmethod
-    def poll(cls, context):
-        view = context.space_data
-        return (view)
-
     def draw(self, context):
         layout = self.layout
 
@@ -3423,11 +3438,6 @@ class VIEW3D_PT_view3d_cursor(Panel):
     bl_region_type = 'UI'
     bl_label = "3D Cursor"
 
-    @classmethod
-    def poll(cls, context):
-        view = context.space_data
-        return (view is not None)
-
     def draw(self, context):
         layout = self.layout
 
@@ -3442,7 +3452,7 @@ class VIEW3D_PT_view3d_name(Panel):
 
     @classmethod
     def poll(cls, context):
-        return (context.space_data and context.active_object)
+        return (context.active_object is not None)
 
     def draw(self, context):
         layout = self.layout
@@ -3465,11 +3475,6 @@ class VIEW3D_PT_view3d_display(Panel):
     bl_region_type = 'UI'
     bl_label = "Display"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        view = context.space_data
-        return (view)
 
     def draw(self, context):
         layout = self.layout
@@ -3533,9 +3538,7 @@ class VIEW3D_PT_view3d_stereo(Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-
-        multiview = scene.render.use_multiview
-        return context.space_data and multiview
+        return scene.render.use_multiview
 
     def draw(self, context):
         layout = self.layout
@@ -3620,11 +3623,6 @@ class VIEW3D_PT_view3d_motion_tracking(Panel):
     bl_label = "Motion Tracking"
     bl_options = {'DEFAULT_CLOSED'}
 
-    @classmethod
-    def poll(cls, context):
-        view = context.space_data
-        return (view)
-
     def draw_header(self, context):
         view = context.space_data
 
@@ -3708,7 +3706,7 @@ class VIEW3D_PT_view3d_meshdisplay(Panel):
         col.label(text="Face Info:")
         col.prop(mesh, "show_extra_face_area", text="Area")
         col.prop(mesh, "show_extra_face_angle", text="Angle")
-        if bpy.app.debug:
+        if context.user_preferences.view.show_developer_ui:
             layout.prop(mesh, "show_extra_indices")
 
 
@@ -3765,8 +3763,7 @@ class VIEW3D_PT_view3d_curvedisplay(Panel):
 
     @classmethod
     def poll(cls, context):
-        editmesh = context.mode == 'EDIT_CURVE'
-        return (editmesh)
+        return (context.mode == 'EDIT_CURVE')
 
     def draw(self, context):
         layout = self.layout
@@ -3892,11 +3889,6 @@ class VIEW3D_PT_transform_orientations(Panel):
     bl_region_type = 'UI'
     bl_label = "Transform Orientations"
     bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        view = context.space_data
-        return (view)
 
     def draw(self, context):
         layout = self.layout
@@ -4107,6 +4099,7 @@ classes = (
     VIEW3D_MT_edit_mesh_extrude,
     VIEW3D_MT_edit_mesh_vertices,
     VIEW3D_MT_edit_mesh_edges,
+    VIEW3D_MT_edit_mesh_edges_data,
     VIEW3D_MT_edit_mesh_faces,
     VIEW3D_MT_edit_mesh_normals,
     VIEW3D_MT_edit_mesh_clean,

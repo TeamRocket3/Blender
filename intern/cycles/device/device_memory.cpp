@@ -24,7 +24,6 @@ CCL_NAMESPACE_BEGIN
 device_memory::device_memory(Device *device, const char *name, MemoryType type)
 : data_type(device_type_traits<uchar>::data_type),
   data_elements(device_type_traits<uchar>::num_elements),
-  data_pointer(0),
   data_size(0),
   device_size(0),
   data_width(0),
@@ -35,7 +34,9 @@ device_memory::device_memory(Device *device, const char *name, MemoryType type)
   interpolation(INTERPOLATION_NONE),
   extension(EXTENSION_REPEAT),
   device(device),
-  device_pointer(0)
+  device_pointer(0),
+  host_pointer(0),
+  shared_pointer(0)
 {
 }
 
@@ -43,14 +44,13 @@ device_memory::~device_memory()
 {
 }
 
-device_ptr device_memory::host_alloc(size_t size)
+void *device_memory::host_alloc(size_t size)
 {
 	if(!size) {
 		return 0;
 	}
 
-	size_t alignment = device->mem_address_alignment();
-	device_ptr ptr = (device_ptr)util_aligned_malloc(size, alignment);
+	void *ptr = util_aligned_malloc(size, MIN_ALIGNMENT_CPU_DATA_TYPES);
 
 	if(ptr) {
 		util_guarded_mem_alloc(size);
@@ -62,11 +62,12 @@ device_ptr device_memory::host_alloc(size_t size)
 	return ptr;
 }
 
-void device_memory::host_free(device_ptr ptr, size_t size)
+void device_memory::host_free()
 {
-	if(ptr) {
-		util_guarded_mem_free(size);
-		util_aligned_free((void*)ptr);
+	if(host_pointer) {
+		util_guarded_mem_free(memory_size());
+		util_aligned_free((void*)host_pointer);
+		host_pointer = 0;
 	}
 }
 
@@ -85,7 +86,7 @@ void device_memory::device_free()
 
 void device_memory::device_copy_to()
 {
-	if(data_size) {
+	if(host_pointer) {
 		device->mem_copy_to(*this);
 	}
 }
@@ -103,6 +104,26 @@ void device_memory::device_zero()
 	}
 }
 
+void device_memory::swap_device(Device *new_device,
+                                size_t new_device_size,
+                                device_ptr new_device_ptr)
+{
+	original_device = device;
+	original_device_size = device_size;
+	original_device_ptr = device_pointer;
+
+	device = new_device;
+	device_size = new_device_size;
+	device_pointer = new_device_ptr;
+}
+
+void device_memory::restore_device()
+{
+	device = original_device;
+	device_size = original_device_size;
+	device_pointer = original_device_ptr;
+}
+
 /* Device Sub Ptr */
 
 device_sub_ptr::device_sub_ptr(device_memory& mem, int offset, int size)
@@ -117,4 +138,3 @@ device_sub_ptr::~device_sub_ptr()
 }
 
 CCL_NAMESPACE_END
-

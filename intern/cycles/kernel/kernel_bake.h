@@ -172,17 +172,6 @@ ccl_device_inline void compute_light_pass(KernelGlobals *kg,
 	path_radiance_accum_sample(L, &L_sample);
 }
 
-ccl_device bool is_aa_pass(ShaderEvalType type)
-{
-	switch(type) {
-		case SHADER_EVAL_UV:
-		case SHADER_EVAL_NORMAL:
-			return false;
-		default:
-			return true;
-	}
-}
-
 /* this helps with AA but it's not the real solution as it does not AA the geometry
  *  but it's better than nothing, thus committed */
 ccl_device_inline float bake_clamp_mirror_repeat(float u, float max)
@@ -327,6 +316,13 @@ ccl_device void kernel_bake_evaluate(KernelGlobals *kg, ccl_global uint4 *input,
 	sd.dv.dx = dvdx;
 	sd.dv.dy = dvdy;
 
+	/* set RNG state for shaders that use sampling */
+	state.rng_hash = rng_hash;
+	state.rng_offset = 0;
+	state.sample = sample;
+	state.num_samples = num_samples;
+	state.min_ray_pdf = FLT_MAX;
+
 	/* light passes if we need more than color */
 	if(pass_filter & ~BAKE_FILTER_COLOR)
 		compute_light_pass(kg, &sd, &L, rng_hash, pass_filter, sample);
@@ -334,15 +330,30 @@ ccl_device void kernel_bake_evaluate(KernelGlobals *kg, ccl_global uint4 *input,
 	switch(type) {
 		/* data passes */
 		case SHADER_EVAL_NORMAL:
+		case SHADER_EVAL_ROUGHNESS:
+		case SHADER_EVAL_EMISSION:
 		{
-			float3 N = sd.N;
-			if((sd.flag & SD_HAS_BUMP)) {
-				shader_eval_surface(kg, &sd, &state, 0);
-				N = shader_bsdf_average_normal(kg, &sd);
+			if(type != SHADER_EVAL_NORMAL || (sd.flag & SD_HAS_BUMP)) {
+				int path_flag = (type == SHADER_EVAL_EMISSION) ? PATH_RAY_EMISSION : 0;
+				shader_eval_surface(kg, &sd, &state, path_flag);
 			}
 
-			/* encoding: normal = (2 * color) - 1 */
-			out = N * 0.5f + make_float3(0.5f, 0.5f, 0.5f);
+			if(type == SHADER_EVAL_NORMAL) {
+				float3 N = sd.N;
+				if(sd.flag & SD_HAS_BUMP) {
+					N = shader_bsdf_average_normal(kg, &sd);
+				}
+
+				/* encoding: normal = (2 * color) - 1 */
+				out = N * 0.5f + make_float3(0.5f, 0.5f, 0.5f);
+			}
+			else if(type == SHADER_EVAL_ROUGHNESS) {
+				float roughness = shader_bsdf_average_roughness(&sd);
+				out = make_float3(roughness, roughness, roughness);
+			}
+			else {
+				out = shader_emissive_eval(kg, &sd);
+			}
 			break;
 		}
 		case SHADER_EVAL_UV:
@@ -350,13 +361,6 @@ ccl_device void kernel_bake_evaluate(KernelGlobals *kg, ccl_global uint4 *input,
 			out = primitive_uv(kg, &sd);
 			break;
 		}
-		case SHADER_EVAL_EMISSION:
-		{
-			shader_eval_surface(kg, &sd, &state, 0);
-			out = shader_emissive_eval(kg, &sd);
-			break;
-		}
-
 #ifdef __PASSES__
 		/* light passes */
 		case SHADER_EVAL_AO:
@@ -485,10 +489,10 @@ ccl_device void kernel_bake_evaluate(KernelGlobals *kg, ccl_global uint4 *input,
 	}
 
 	/* write output */
-	const float output_fac = is_aa_pass(type)? 1.0f/num_samples: 1.0f;
+	const float output_fac = 1.0f/num_samples;
 	const float4 scaled_result = make_float4(out.x, out.y, out.z, 1.0f) * output_fac;
 
-	output[i] = (sample == 0)?  scaled_result: output[i] + scaled_result;
+	output[i] = (sample == 0)? scaled_result: output[i] + scaled_result;
 }
 
 #endif  /* __BAKING__ */
@@ -559,4 +563,3 @@ ccl_device void kernel_background_evaluate(KernelGlobals *kg,
 }
 
 CCL_NAMESPACE_END
-

@@ -89,6 +89,7 @@ const EnumPropertyItem rna_enum_bake_pass_type_items[] = {
 	{SCE_PASS_SHADOW, "SHADOW", 0, "Shadow", ""},
 	{SCE_PASS_NORMAL, "NORMAL", 0, "Normal", ""},
 	{SCE_PASS_UV, "UV", 0, "UV", ""},
+	{SCE_PASS_ROUGHNESS, "ROUGHNESS", 0, "ROUGHNESS", ""},
 	{SCE_PASS_EMIT, "EMIT", 0, "Emit", ""},
 	{SCE_PASS_ENVIRONMENT, "ENVIRONMENT", 0, "Environment", ""},
 	{SCE_PASS_DIFFUSE_COLOR, "DIFFUSE", 0, "Diffuse", ""},
@@ -122,7 +123,7 @@ static void engine_tag_update(RenderEngine *engine)
 	engine->flag |= RE_ENGINE_DO_UPDATE;
 }
 
-static int engine_support_display_space_shader(RenderEngine *UNUSED(engine), Scene *scene)
+static bool engine_support_display_space_shader(RenderEngine *UNUSED(engine), Scene *scene)
 {
 	return IMB_colormanagement_support_glsl_draw(&scene->view_settings);
 }
@@ -286,7 +287,7 @@ static void rna_RenderEngine_unregister(Main *bmain, StructRNA *type)
 
 	if (!et)
 		return;
-	
+
 	RNA_struct_free_extension(type, &et->ext);
 	RNA_struct_free(&BLENDER_RNA, type);
 	BLI_freelinkN(&R_engines, et);
@@ -327,7 +328,7 @@ static StructRNA *rna_RenderEngine_register(
 			break;
 		}
 	}
-	
+
 	/* create a new engine type */
 	et = MEM_callocN(sizeof(RenderEngineType), "python render engine");
 	memcpy(et, &dummyet, sizeof(dummyet));
@@ -792,7 +793,7 @@ static void rna_def_render_result(BlenderRNA *brna)
 
 	FunctionRNA *func;
 	PropertyRNA *parm;
-	
+
 	srna = RNA_def_struct(brna, "RenderResult", NULL);
 	RNA_def_struct_ui_text(srna, "Render Result", "Result of rendering, including all layers and passes");
 
@@ -892,7 +893,7 @@ static void rna_def_render_layer(BlenderRNA *brna)
 
 	FunctionRNA *func;
 	PropertyRNA *parm;
-	
+
 	srna = RNA_def_struct(brna, "RenderLayer", NULL);
 	RNA_def_struct_ui_text(srna, "Render Layer", "");
 

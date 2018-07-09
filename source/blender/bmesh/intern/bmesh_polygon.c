@@ -36,8 +36,8 @@
 #include "BLI_alloca.h"
 #include "BLI_math.h"
 #include "BLI_memarena.h"
-#include "BLI_polyfill2d.h"
-#include "BLI_polyfill2d_beautify.h"
+#include "BLI_polyfill_2d.h"
+#include "BLI_polyfill_2d_beautify.h"
 #include "BLI_linklist.h"
 #include "BLI_edgehash.h"
 #include "BLI_heap.h"
@@ -510,6 +510,18 @@ void BM_face_calc_tangent_auto(const BMFace *f, float r_tangent[3])
 }
 
 /**
+ * expands bounds (min/max must be initialized).
+ */
+void BM_face_calc_bounds_expand(const BMFace *f, float min[3], float max[3])
+{
+	const BMLoop *l_iter, *l_first;
+	l_iter = l_first = BM_FACE_FIRST_LOOP(f);
+	do {
+		minmax_v3v3_v3(min, max, l_iter->v->co);
+	} while ((l_iter = l_iter->next) != l_first);
+}
+
+/**
  * computes center of face in 3d.  uses center of bounding box.
  */
 void BM_face_calc_center_bounds(const BMFace *f, float r_cent[3])
@@ -599,7 +611,7 @@ void BM_edge_normals_update(BMEdge *e)
 {
 	BMIter iter;
 	BMFace *f;
-	
+
 	BM_ITER_ELEM (f, &iter, e, BM_FACES_OF_EDGE) {
 		BM_face_normal_update(f);
 	}
@@ -874,7 +886,7 @@ bool BM_face_point_inside_test(const BMFace *f, const float co[3])
 	float co_2d[2];
 	BMLoop *l_iter;
 	int i;
-	
+
 	BLI_assert(BM_face_is_normal_valid(f));
 
 	axis_dominant_v3_to_m3(axis_mat, f->no);
@@ -1187,7 +1199,7 @@ void BM_face_splits_check_legal(BMesh *bm, BMFace *f, BMLoop *(*loops)[2], int l
 		out[1] = max_ff(out[1], projverts[i][1]);
 	}
 	bm->elem_index_dirty |= BM_LOOP;
-	
+
 	/* ensure we are well outside the face bounds (value is arbitrary) */
 	add_v2_fl(out, 1.0f);
 
@@ -1200,7 +1212,7 @@ void BM_face_splits_check_legal(BMesh *bm, BMFace *f, BMLoop *(*loops)[2], int l
 	for (i = 0; i < len; i++) {
 		float mid[2];
 		mid_v2_v2v2(mid, edgeverts[i][0], edgeverts[i][1]);
-		
+
 		int isect = 0;
 		int j_prev;
 		for (j = 0, j_prev = f->len - 1; j < f->len; j_prev = j++) {
@@ -1414,6 +1426,17 @@ void BM_mesh_calc_tessellation(BMesh *bm, BMLoop *(*looptris)[3], int *r_looptri
 			(l_ptr_a[2] = l_ptr_b[1] = l = l->next);
 			(             l_ptr_b[2] = l->next);
 #endif
+
+			if (UNLIKELY(is_quad_flip_v3_first_third_fast(
+			                     l_ptr_a[0]->v->co,
+			                     l_ptr_a[1]->v->co,
+			                     l_ptr_a[2]->v->co,
+			                     l_ptr_b[2]->v->co)))
+			{
+				/* flip out of degenerate 0-2 state. */
+				l_ptr_a[2] = l_ptr_b[2];
+				l_ptr_b[0] = l_ptr_a[1];
+			}
 		}
 
 #endif /* USE_TESSFACE_SPEEDUP */
