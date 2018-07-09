@@ -190,61 +190,6 @@ bool RenderBuffers::get_denoising_pass_rect(int offset, float exposure, int samp
 	return true;
 }
 
-bool RenderBuffers::get_aov_rect(ustring name, float exposure, int sample, int components, float *pixels)
-{
-	int aov_offset = 0;
-
-	AOV *aov = params.passes.get_aov(name, aov_offset);
-
-	if(!aov) {
-		return false;
-	}
-
-	float *in = (float*)buffer.data_pointer + aov_offset;
-	int pass_stride = params.passes.get_size();
-
-	float scale = (aov->type == AOV_RGB) ? exposure/sample : 1.0f/(float)sample; /* TODO has_exposure */
-
-	int size = params.width*params.height;
-
-	switch(components) {
-		case 1:
-			assert(aov->type == AOV_FLOAT);
-			for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
-				float f = *in;
-				pixels[0] = f*scale;
-			}
-			break;
-		case 3:
-			assert(aov->type == AOV_RGB);
-			for(int i = 0; i < size; i++, in += pass_stride, pixels += 3) {
-				float3 f = make_float3(in[0], in[1], in[2]);
-				
-				pixels[0] = f.x*scale;
-				pixels[1] = f.y*scale;
-				pixels[2] = f.z*scale;
-			}
-			break;
-		case 4:
-			assert(aov->type == AOV_CRYPTOMATTE);
-			for(int i = 0; i < size; i++, in += pass_stride, pixels += 4) {
-				float4 f = make_float4(in[0], in[1], in[2], in[3]);
-				
-				/* cryptomatte simple sorting for two layers */
-				pixels[0] = f.y > f.w ? f.x : f.z;
-				pixels[1] = (f.y > f.w ? f.y : f.w)*scale;
-				pixels[2] = f.y > f.w ? f.z : f.x;
-				pixels[3] = (f.y > f.w ? f.w : f.y)*scale;
-			}
-			break;
-		default:
-			assert(0);
-			return false;
-	}
-
-	return true;
-}
-
 bool RenderBuffers::get_pass_rect(PassType type, float exposure, int sample, int components, float *pixels)
 {
 	int pass_offset = 0;
@@ -478,5 +423,59 @@ void DisplayBuffer::write(const string& filename)
 	delete out;
 }
 
-CCL_NAMESPACE_END
+bool RenderBuffers::get_aov_rect(ustring name, float exposure, int sample, int components, float *pixels)
+{
+	int aov_offset = 0;
 
+	AOV *aov = params.passes.get_aov(name, aov_offset);
+
+	if(!aov) {
+		return false;
+	}
+
+	float *in = (float*)buffer.data_pointer + aov_offset;
+	int pass_stride = params.passes.get_size();
+
+	float scale = (aov->type == AOV_RGB) ? exposure / sample : 1.0f / (float)sample; /* TODO has_exposure */
+
+	int size = params.width*params.height;
+
+	switch(components) {
+	case 1:
+		assert(aov->type == AOV_FLOAT);
+		for(int i = 0; i < size; i++, in += pass_stride, pixels++) {
+			float f = *in;
+			pixels[0] = f * scale;
+		}
+		break;
+	case 3:
+		assert(aov->type == AOV_RGB);
+		for(int i = 0; i < size; i++, in += pass_stride, pixels += 3) {
+			float3 f = make_float3(in[0], in[1], in[2]);
+
+			pixels[0] = f.x*scale;
+			pixels[1] = f.y*scale;
+			pixels[2] = f.z*scale;
+		}
+		break;
+	case 4:
+		assert(aov->type == AOV_CRYPTOMATTE);
+		for(int i = 0; i < size; i++, in += pass_stride, pixels += 4) {
+			float4 f = make_float4(in[0], in[1], in[2], in[3]);
+
+			/* cryptomatte simple sorting for two layers */
+			pixels[0] = f.y > f.w ? f.x : f.z;
+			pixels[1] = (f.y > f.w ? f.y : f.w)*scale;
+			pixels[2] = f.y > f.w ? f.z : f.x;
+			pixels[3] = (f.y > f.w ? f.w : f.y)*scale;
+		}
+		break;
+	default:
+		assert(0);
+		return false;
+	}
+
+	return true;
+}
+
+CCL_NAMESPACE_END
