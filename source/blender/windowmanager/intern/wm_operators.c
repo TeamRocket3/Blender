@@ -262,7 +262,7 @@ char *WM_operator_pystring_ex(bContext *C, wmOperator *op, const bool all_args, 
 		}
 	}
 	else {
-		/* only to get the orginal props for comparisons */
+		/* only to get the original props for comparisons */
 		PointerRNA opptr_default;
 		const bool macro_args_test = ot->macro.first ? macro_args : true;
 
@@ -607,7 +607,7 @@ void WM_operator_properties_sanitize(PointerRNA *ptr, const bool no_context)
 /** set all props to their default,
  * \param do_update Only update un-initialized props.
  *
- * \note, theres nothing specific to operators here.
+ * \note, there's nothing specific to operators here.
  * this could be made a general function.
  */
 bool WM_operator_properties_default(PointerRNA *ptr, const bool do_update)
@@ -768,6 +768,7 @@ static uiBlock *wm_enum_search_menu(bContext *C, ARegion *ar, void *arg_op)
 
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
 	UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
+	UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_POPUP);
 
 	search[0] = '\0';
 #if 0 /* ok, this isn't so easy... */
@@ -980,6 +981,8 @@ static uiBlock *wm_block_create_redo(bContext *C, ARegion *ar, void *arg_op)
 
 	block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
 	UI_block_flag_disable(block, UI_BLOCK_LOOP);
+	UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_REGULAR);
+
 	/* UI_BLOCK_NUMSELECT for layer buttons */
 	UI_block_flag_enable(block, UI_BLOCK_NUMSELECT | UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
 
@@ -1064,6 +1067,7 @@ static uiBlock *wm_block_dialog_create(bContext *C, ARegion *ar, void *userData)
 
 	block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
 	UI_block_flag_disable(block, UI_BLOCK_LOOP);
+	UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_REGULAR);
 
 	/* intentionally don't use 'UI_BLOCK_MOVEMOUSE_QUIT', some dialogues have many items
 	 * where quitting by accident is very annoying */
@@ -1106,6 +1110,7 @@ static uiBlock *wm_operator_ui_create(bContext *C, ARegion *ar, void *userData)
 	block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
 	UI_block_flag_disable(block, UI_BLOCK_LOOP);
 	UI_block_flag_enable(block, UI_BLOCK_KEEP_OPEN | UI_BLOCK_MOVEMOUSE_QUIT);
+	UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_REGULAR);
 
 	layout = UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, 0, 0, data->width, data->height, 0, style);
 
@@ -1433,6 +1438,7 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	 * with the OS when the splash shows, window clipping in this case gives
 	 * ugly results and clipping the splash isn't useful anyway, just disable it [#32938] */
 	UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_KEEP_OPEN | UI_BLOCK_NO_WIN_CLIP);
+	UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_POPUP);
 
 	/* XXX splash scales with pixelsize, should become widget-units */
 	but = uiDefBut(block, UI_BTYPE_IMAGE, 0, "", 0, 0.5f * U.widget_unit, U.pixelsize * 501, U.pixelsize * 282, ibuf, 0.0, 0.0, 0, 0, ""); /* button owns the imbuf now */
@@ -1498,16 +1504,16 @@ static uiBlock *wm_block_create_splash(bContext *C, ARegion *ar, void *UNUSED(ar
 	uiItemStringO(col, IFACE_("Support an Open Animation Movie"), ICON_URL, "WM_OT_url_open", "url",
 	              "https://cloud.blender.org/join");
 #endif
-	uiItemStringO(col, IFACE_("Donations"), ICON_URL, "WM_OT_url_open", "url",
+	uiItemStringO(col, IFACE_("TEAM ROCKET"), ICON_URL, "WM_OT_url_open", "url",
 	              "http://www.blender.org/foundation/donation-payment/");
-	uiItemStringO(col, IFACE_("Credits"), ICON_URL, "WM_OT_url_open", "url",
+	uiItemStringO(col, IFACE_("Javier"), ICON_URL, "WM_OT_url_open", "url",
 	              "http://www.blender.org/about/credits/");
 	BLI_snprintf(url, sizeof(url), "http://wiki.blender.org/index.php/Dev:Ref/Release_Notes/%d.%d",
 	             BLENDER_VERSION / 100, BLENDER_VERSION % 100);
-	uiItemStringO(col, IFACE_("Release Log"), ICON_URL, "WM_OT_url_open", "url", url);
-	uiItemStringO(col, IFACE_("Manual"), ICON_URL, "WM_OT_url_open", "url",
+	uiItemStringO(col, IFACE_("Charles"), ICON_URL, "WM_OT_url_open", "url", url);
+	uiItemStringO(col, IFACE_("Pierro"), ICON_URL, "WM_OT_url_open", "url",
 	              "https://docs.blender.org/manual/en/dev/");
-	uiItemStringO(col, IFACE_("Blender Website"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
+	uiItemStringO(col, IFACE_("Tony"), ICON_URL, "WM_OT_url_open", "url", "http://www.blender.org");
 	if (STREQ(STRINGIFY(BLENDER_VERSION_CYCLE), "release")) {
 		BLI_snprintf(url, sizeof(url), "https://docs.blender.org/api/%d.%d"STRINGIFY(BLENDER_VERSION_CHAR),
 		             BLENDER_VERSION / 100, BLENDER_VERSION % 100);
@@ -1582,6 +1588,7 @@ static uiBlock *wm_block_search_menu(bContext *C, ARegion *ar, void *userdata)
 
 	block = UI_block_begin(C, ar, "_popup", UI_EMBOSS);
 	UI_block_flag_enable(block, UI_BLOCK_LOOP | UI_BLOCK_MOVEMOUSE_QUIT | UI_BLOCK_SEARCH_MENU);
+	UI_block_theme_style_set(block, UI_BLOCK_THEME_STYLE_POPUP);
 
 	but = uiDefSearchBut(block, search, 0, ICON_VIEWZOOM, sizeof(search), 10, 10, init_data->size[0], UI_UNIT_Y, 0, 0, "");
 	UI_but_func_operator_search(but);
