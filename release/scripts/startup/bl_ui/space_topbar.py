@@ -510,6 +510,10 @@ class TOPBAR_MT_help(Menu):
         show_developer = context.user_preferences.view.show_developer_ui
 
         layout.operator(
+            "wm.url_open", text="Team Rock3t", icon='URL',
+        ).url = "https://github.com/TeamRocket3/Blender"
+
+        layout.operator(
             "wm.url_open", text="Manual", icon='HELP',
         ).url = "https://docs.blender.org/manual/en/dev/"
 
