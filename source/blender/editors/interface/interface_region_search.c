@@ -179,7 +179,10 @@ static void ui_searchbox_select(bContext *C, ARegion *ar, uiBut *but, int step)
 			ui_searchbox_update(C, ar, but, false);
 		}
 		else {
-			data->active = data->items.totitem - 1;
+			// if bottom reached, wrap to top
+			data->active = 0;
+			data->items.offset = 0;
+			ui_searchbox_update(C, ar, but, false);
 		}
 	}
 	else if (data->active < 0) {
@@ -188,10 +191,13 @@ static void ui_searchbox_select(bContext *C, ARegion *ar, uiBut *but, int step)
 			data->active = 0;
 			ui_searchbox_update(C, ar, but, false);
 		}
-		else {
-			/* only let users step into an 'unset' state for unlink buttons */
-			data->active = (but->flag & UI_BUT_VALUE_CLEAR) ? -1 : 0;
-		}
+		/* only let users step into an 'unset' state for unlink buttons */
+		else if (but->flag & UI_BUT_VALUE_CLEAR)
+			data->active = -1;
+
+		// Wrap top to bottom
+		else if (step && !data->items.more)
+			data->active = data->items.totitem - 1;
 	}
 
 	ED_region_tag_redraw(ar);
