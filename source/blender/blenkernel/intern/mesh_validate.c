@@ -908,16 +908,15 @@ static bool mesh_validate_customdata(
 				ok = false;
 			}
 		}
-
-		if (ok == false) {
+		if (ok) {
+			i++;
+		}
+		else {
 			if (do_fixes) {
 				CustomData_free_layer(data, layer->type, 0, i);
 				has_fixes = true;
 			}
 		}
-
-		if (ok)
-			i++;
 	}
 
 	PRINT_MSG("%s: Finished (is_valid=%d)\n\n", __func__, (int)!has_fixes);
