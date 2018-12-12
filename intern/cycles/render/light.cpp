@@ -713,7 +713,7 @@ void LightManager::device_update_points(Device *,
 
 			float angular_diameter = 0.526;
 			float degrees = 180;
-			float radius = angular_diameter*180/M_PI_F;
+			float radius = angular_diameter*degrees/M_PI_F;
 			float angle = atanf(radius);
 			float cosangle = cosf(angle);
 			float area = M_PI_F*radius*radius;
