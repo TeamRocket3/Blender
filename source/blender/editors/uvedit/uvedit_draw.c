@@ -475,7 +475,7 @@ static void draw_uvs_other_mesh(Object *ob, const Image *curimage,
 		}
 	}
 
-	if (ok == false) {
+	if (!ok) {
 		return;
 	}
 
