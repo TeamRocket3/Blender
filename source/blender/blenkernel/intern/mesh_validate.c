@@ -909,7 +909,7 @@ static bool mesh_validate_customdata(
 			}
 		}
 
-		if (ok == false) {
+		if (!ok) {
 			if (do_fixes) {
 				CustomData_free_layer(data, layer->type, 0, i);
 				has_fixes = true;
