@@ -6063,7 +6063,7 @@ int join_curve_exec(bContext *C, wmOperator *op)
 	CTX_DATA_END;
 
 	/* that way the active object is always selected */
-	if (ok == false) {
+	if (!ok) {
 		BKE_report(op->reports, RPT_WARNING, "Active object is not a selected curve");
 		return OPERATOR_CANCELLED;
 	}
