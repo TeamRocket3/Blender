@@ -257,8 +257,8 @@ void ED_view3d_smooth_view_ex(
 	}
 
 	/* if we get here nothing happens */
-	if (ok == false) {
-		if (sms.to_camera == false) {
+	if (!ok) {
+		if (!sms.to_camera) {
 			copy_v3_v3(rv3d->ofs, sms.dst.ofs);
 			copy_qt_qt(rv3d->viewquat, sms.dst.quat);
 			rv3d->dist = sms.dst.dist;
