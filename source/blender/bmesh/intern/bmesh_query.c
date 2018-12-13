@@ -2140,7 +2140,7 @@ bool BM_face_exists_multi(BMVert **varr, BMEdge **earr, int len)
 			}
 		}
 
-		if (ok == false) {
+		if (!ok) {
 			break;
 		}
 	}
