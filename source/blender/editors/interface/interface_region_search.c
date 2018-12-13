@@ -179,7 +179,9 @@ static void ui_searchbox_select(bContext *C, ARegion *ar, uiBut *but, int step)
 			ui_searchbox_update(C, ar, but, false);
 		}
 		else {
-			data->active = data->items.totitem - 1;
+			data->active = 0;
+			data->items.offset = 0;
+			ui_searchbox_update(C, ar, but, false);
 		}
 	}
 	else if (data->active < 0) {
