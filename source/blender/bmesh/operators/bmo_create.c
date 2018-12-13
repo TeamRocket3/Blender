@@ -127,9 +127,10 @@ void bmo_contextual_create_exec(BMesh *bm, BMOperator *op)
 			}
 			else {
 				ok = false; /* if a vertex has 3+ edge users then cancel - this is only simple cases */
+				break;
 			}
 
-			if (ok == false) {
+			if (!ok) {
 				break;
 			}
 		}
