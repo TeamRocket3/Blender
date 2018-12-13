@@ -155,7 +155,7 @@ static bool undosys_step_encode(bContext *C, UndoStep *us)
 			us->type->step_foreach_ID_ref(us, undosys_id_ref_store, bmain);
 		}
 	}
-	if (ok == false) {
+	else {
 		CLOG_INFO(&LOG, 2, "encode callback didn't create undo step");
 	}
 	return ok;
