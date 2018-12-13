@@ -569,7 +569,7 @@ static int gp_strokes_paste_exec(bContext *C, wmOperator *op)
 			}
 		}
 
-		if (ok == false) {
+		if (!ok) {
 			/* XXX: this check is not 100% accurate (i.e. image editor is incompatible with normal 2D strokes),
 			 * but should be enough to give users a good idea of what's going on
 			 */
