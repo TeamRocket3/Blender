@@ -4472,9 +4472,9 @@ bool ed_editnurb_spin(float viewmat[4][4], Object *obedit, const float axis[3], 
 	for (a = 0; a < 7; a++) {
 		ok = ed_editnurb_extrude_flag(cu->editnurb, SELECT);
 
-		if (ok == false)
+		if (!ok) {
 			return changed;
-
+		}
 		changed = true;
 
 		rotateflagNurb(editnurb, SELECT, cent, rotmat);
