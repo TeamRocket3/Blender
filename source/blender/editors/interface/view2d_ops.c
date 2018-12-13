@@ -1494,7 +1494,7 @@ void UI_view2d_smooth_view(
 	}
 
 	/* if we get here nothing happens */
-	if (ok == false) {
+	if (!ok) {
 		v2d->cur = sms.new_cur;
 
 		UI_view2d_curRect_validate(v2d);
