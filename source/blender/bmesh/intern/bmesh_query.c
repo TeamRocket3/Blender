@@ -2101,9 +2101,6 @@ bool BM_face_exists_multi(BMVert **varr, BMEdge **earr, int len)
 					tot_tag++;
 				}
 			}
-			else {
-				/* we already found! */
-			}
 		}
 	}
 
@@ -2140,7 +2137,7 @@ bool BM_face_exists_multi(BMVert **varr, BMEdge **earr, int len)
 			}
 		}
 
-		if (ok == false) {
+		if (!ok) {
 			break;
 		}
 	}
@@ -2279,7 +2276,7 @@ bool BM_face_exists_overlap_subset(BMVert **varr, const int len)
 		}
 	}
 
-	if (is_init == true) {
+	if (is_init) {
 		for (int i = 0; i < len; i++) {
 			BM_ELEM_API_FLAG_DISABLE(varr[i], _FLAG_OVERLAP);
 		}
@@ -2516,7 +2513,7 @@ int BM_mesh_calc_face_groups(
 			}
 		}
 
-		BLI_assert(ok == true);
+		BLI_assert(ok);
 		UNUSED_VARS_NDEBUG(ok);
 
 		/* manage arrays */
