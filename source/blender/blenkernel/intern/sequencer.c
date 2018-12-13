@@ -4333,7 +4333,7 @@ bool BKE_sequence_base_isolated_sel_check(ListBase *seqbase)
 		}
 	}
 
-	if (ok == false)
+	if (!ok)
 		return false;
 
 	/* test relationships */
